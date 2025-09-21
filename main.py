@@ -27,9 +27,15 @@ app = FastAPI(
 # Configure CORS (Cross-Origin Resource Sharing)
 # This allows the frontend to communicate with the backend
 # In production, replace "*" with your frontend URL for security
+environment = os.getenv("ENVIRONMENT", "development")
+allowed_origins = ["*"] if environment == "development" else [
+    "https://your-frontend-domain.com",  # Replace with your actual frontend URL
+    "http://localhost:3000",  # For local development
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify your frontend URL here
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],  # Allows all HTTP methods
     allow_headers=["*"],  # Allows all headers
