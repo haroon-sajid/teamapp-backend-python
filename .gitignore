@@ -1,3 +1,8 @@
+# Environment variables
+.env
+.env.local
+.env.production
+
 # Python
 __pycache__/
 *.py[cod]
@@ -20,31 +25,21 @@ wheels/
 .installed.cfg
 *.egg
 
-# Virtual Environment
+# Virtual environment
 venv/
 env/
 ENV/
-env.bak/
-venv.bak/
 
 # Database
 *.db
 *.sqlite
 *.sqlite3
-kanban_board.db
-
-# Environment variables
-.env
-.env.local
-.env.production
-.env.development
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
 
 # OS
 .DS_Store
@@ -54,14 +49,11 @@ Thumbs.db
 *.log
 logs/
 
-# Testing
-.pytest_cache/
-.coverage
+# Coverage reports
 htmlcov/
-
-# FastAPI
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+.hypothesis/
 .pytest_cache/
-
-# Temporary files
-*.tmp
-*.temp

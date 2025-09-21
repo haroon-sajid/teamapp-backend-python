@@ -3,6 +3,7 @@ Main FastAPI application entry point.
 This file sets up the FastAPI app and includes all routers.
 """
 
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -95,4 +96,6 @@ async def shutdown_event():
 # It's useful for development, but in production you'll use uvicorn command
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host=host, port=port, reload=True)
