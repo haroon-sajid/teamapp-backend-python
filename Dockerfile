@@ -11,8 +11,12 @@ RUN apt-get update && apt-get install -y \
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies with no cache and upgrade pip
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Verify email-validator is installed
+RUN python -c "import email_validator; print('email-validator installed successfully')"
 
 # Copy the rest of the application
 COPY . .
