@@ -18,6 +18,9 @@ RUN pip install --upgrade pip && \
 # Copy the rest of the application
 COPY . .
 
+# Test schemas to verify no email validation issues
+RUN python test_schemas.py
+
 # Expose port
 EXPOSE 8000
 
