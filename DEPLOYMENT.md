@@ -46,7 +46,7 @@ git add .
 git commit -m "Prepare for Render deployment"
 
 # Add your GitHub repository as remote
-git remote add origin https://github.com/yourusername/your-repo-name.git
+git remote add origin https://github.com/haroon-sajid/teamapp-backend-python.git
 
 # Push to GitHub
 git push -u origin main
@@ -66,7 +66,7 @@ git push -u origin main
 
 1. In your Render dashboard, click **"New +"** → **"Web Service"**
 2. Connect your GitHub account if not already connected
-3. Select your repository: `teamapp-backend-python`
+3. Select your repository: `haroon-sajid/teamapp-backend-python`
 4. Configure the service:
    - **Name**: `kanban-board-api` (or your preferred name)
    - **Environment**: **Docker**
@@ -202,4 +202,10 @@ If you encounter issues:
 4. Check the [Render documentation](https://render.com/docs)
 5. Review the [FastAPI documentation](https://fastapi.tiangolo.com/)
 
-Your FastAPI backend should now be successfully deployed on Render! 
+Your FastAPI backend should now be successfully deployed on Render! 🚀
+
+## Repository Information
+
+- **GitHub Repository**: [https://github.com/haroon-sajid/teamapp-backend-python](https://github.com/haroon-sajid/teamapp-backend-python)
+- **Author**: [@haroon-sajid](https://github.com/haroon-sajid)
+- **Project Name**: Team App Backend Python

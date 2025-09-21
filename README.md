@@ -31,8 +31,8 @@ A RESTful API backend for a Kanban board application built with FastAPI, SQLAlch
 
 ### 1. Clone the repository
 ```bash
-git clone https://github.com/YOUR_USERNAME/kanban-board-backend.git
-cd kanban-board-backend
+git clone https://github.com/haroon-sajid/teamapp-backend-python.git
+cd teamapp-backend-python
 ```
 
 ### 2. Create and activate virtual environment
@@ -265,6 +265,11 @@ To reset the database, delete the `kanban_board.db` file and restart the server.
 3. Make your changes
 4. Add tests if applicable
 5. Submit a pull request
+
+## Repository
+
+- **GitHub**: [https://github.com/haroon-sajid/teamapp-backend-python](https://github.com/haroon-sajid/teamapp-backend-python)
+- **Author**: [@haroon-sajid](https://github.com/haroon-sajid)
 
 ## License
 
