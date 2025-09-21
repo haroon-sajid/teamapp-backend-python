@@ -40,6 +40,10 @@ class User(Base):
     # Role can be either 'admin' or 'member'
     role = Column(SQLEnum(UserRole), default=UserRole.MEMBER, nullable=False)
     
+    # Password reset fields
+    reset_token = Column(String, nullable=True, unique=True, index=True)
+    reset_token_expires = Column(DateTime(timezone=True), nullable=True)
+    
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

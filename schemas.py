@@ -12,9 +12,25 @@ from models import UserRole, TaskStatus
 # User Schemas
 class UserBase(BaseModel):
     """Base schema for User with common attributes"""
-    email: str = Field(..., min_length=5, max_length=255, description="Valid email address")
-    username: str = Field(..., min_length=3, max_length=50, description="Username")
-    role: UserRole = UserRole.MEMBER
+    email: str = Field(
+        ..., 
+        min_length=5, 
+        max_length=255, 
+        description="Valid email address",
+        examples=["user@example.com", "john.doe@gmail.com", "admin@company.com"]
+    )
+    username: str = Field(
+        ..., 
+        min_length=3, 
+        max_length=50, 
+        description="Username (3-50 characters, letters, numbers, underscores, hyphens)",
+        examples=["john_doe", "user123", "admin-user", "testuser"]
+    )
+    role: UserRole = Field(
+        default=UserRole.MEMBER,
+        description="User role in the system",
+        examples=["member", "admin", "moderator"]
+    )
 
     @field_validator('email')
     @classmethod
@@ -57,7 +73,13 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     """Schema for creating a new user (signup)"""
-    password: str = Field(..., min_length=8, max_length=128, description="Password")
+    password: str = Field(
+        ..., 
+        min_length=8, 
+        max_length=128, 
+        description="Password (minimum 8 characters, must contain letters and numbers)",
+        examples=["mypassword123", "securepass456", "userpass789"]
+    )
 
     @field_validator('password')
     @classmethod
@@ -83,8 +105,19 @@ class UserCreate(UserBase):
 
 class UserLogin(BaseModel):
     """Schema for user login"""
-    email: str = Field(..., min_length=5, max_length=255, description="Valid email address")
-    password: str = Field(..., min_length=1, description="Password")
+    email: str = Field(
+        ..., 
+        min_length=5, 
+        max_length=255, 
+        description="Your email address",
+        examples=["user@example.com", "john.doe@gmail.com"]
+    )
+    password: str = Field(
+        ..., 
+        min_length=1, 
+        description="Your password",
+        examples=["mypassword123", "securepass456"]
+    )
 
     @field_validator('email')
     @classmethod
@@ -124,8 +157,19 @@ class TokenData(BaseModel):
 # Project Schemas
 class ProjectBase(BaseModel):
     """Base schema for Project with common attributes"""
-    name: str = Field(..., min_length=1, max_length=100, description="Project name")
-    description: Optional[str] = Field(None, max_length=500, description="Project description")
+    name: str = Field(
+        ..., 
+        min_length=1, 
+        max_length=100, 
+        description="Project name",
+        examples=["My Awesome Project", "Website Redesign", "Mobile App Development", "Data Analysis"]
+    )
+    description: Optional[str] = Field(
+        None, 
+        max_length=500, 
+        description="Project description (optional)",
+        examples=["A comprehensive web application for team collaboration", "Redesigning the company website with modern UI/UX", "Building a mobile app for iOS and Android"]
+    )
 
     @field_validator('name')
     @classmethod
@@ -174,9 +218,24 @@ class ProjectWithTasks(ProjectResponse):
 # Task Schemas
 class TaskBase(BaseModel):
     """Base schema for Task with common attributes"""
-    title: str = Field(..., min_length=1, max_length=200, description="Task title")
-    description: Optional[str] = Field(None, max_length=1000, description="Task description")
-    status: TaskStatus = TaskStatus.TODO
+    title: str = Field(
+        ..., 
+        min_length=1, 
+        max_length=200, 
+        description="Task title",
+        examples=["Design user interface", "Implement authentication", "Write unit tests", "Deploy to production", "Fix bug in login"]
+    )
+    description: Optional[str] = Field(
+        None, 
+        max_length=1000, 
+        description="Task description (optional)",
+        examples=["Create responsive design for mobile and desktop", "Add JWT token authentication with refresh tokens", "Write comprehensive test coverage for all endpoints", "Deploy the application to production environment"]
+    )
+    status: TaskStatus = Field(
+        default=TaskStatus.TODO,
+        description="Task status",
+        examples=["todo", "in_progress", "done"]
+    )
 
     @field_validator('title')
     @classmethod
@@ -200,13 +259,32 @@ class TaskBase(BaseModel):
 
 class TaskCreate(TaskBase):
     """Schema for creating a new task"""
-    project_id: int
+    project_id: int = Field(
+        ..., 
+        description="ID of the project this task belongs to",
+        examples=[1, 2, 3, 5]
+    )
 
 class TaskUpdate(BaseModel):
     """Schema for updating a task (all fields optional)"""
-    title: Optional[str] = None
-    description: Optional[str] = None
-    status: Optional[TaskStatus] = None
+    title: Optional[str] = Field(
+        None, 
+        min_length=1, 
+        max_length=200, 
+        description="Updated task title",
+        examples=["Updated task title", "Fixed: Design user interface", "Completed: Implement authentication"]
+    )
+    description: Optional[str] = Field(
+        None, 
+        max_length=1000, 
+        description="Updated task description",
+        examples=["Updated description with more details", "Added implementation notes", "Completed with additional features"]
+    )
+    status: Optional[TaskStatus] = Field(
+        None,
+        description="Updated task status",
+        examples=["todo", "in_progress", "done"]
+    )
 
 class TaskResponse(TaskBase):
     """Schema for task response"""
@@ -222,7 +300,109 @@ class TaskResponse(TaskBase):
 
 class TaskAssign(BaseModel):
     """Schema for assigning a task to a user"""
-    user_id: int
+    user_id: int = Field(
+        ..., 
+        description="ID of the user to assign the task to",
+        examples=[1, 2, 3, 5, 10]
+    )
+
+# Password Reset Schemas
+class PasswordResetRequest(BaseModel):
+    """Schema for requesting password reset"""
+    email: str = Field(
+        ..., 
+        min_length=5, 
+        max_length=255, 
+        description="Email address to send reset link to",
+        examples=["user@example.com", "john.doe@gmail.com"]
+    )
+
+    @field_validator('email')
+    @classmethod
+    def validate_email(cls, value: str) -> str:
+        """Validate email format using regex pattern"""
+        if not value:
+            raise ValueError('Email is required')
+        
+        # Comprehensive email regex pattern
+        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        
+        if not re.match(email_pattern, value):
+            raise ValueError('Invalid email format. Please provide a valid email address.')
+        
+        return value.lower().strip()
+
+class PasswordReset(BaseModel):
+    """Schema for resetting password with token"""
+    token: str = Field(..., description="Password reset token")
+    new_password: str = Field(
+        ..., 
+        min_length=8, 
+        max_length=128, 
+        description="New password (minimum 8 characters, must contain letters and numbers)",
+        examples=["newpassword123", "securepass456", "resetpass789"]
+    )
+
+    @field_validator('new_password')
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        """Validate password strength"""
+        if not value:
+            raise ValueError('Password is required')
+        
+        if len(value) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        
+        if len(value) > 128:
+            raise ValueError('Password must be less than 128 characters')
+        
+        # Check for at least one letter and one number
+        if not re.search(r'[A-Za-z]', value):
+            raise ValueError('Password must contain at least one letter')
+        
+        if not re.search(r'\d', value):
+            raise ValueError('Password must contain at least one number')
+        
+        return value
+
+class PasswordChange(BaseModel):
+    """Schema for changing password (requires current password)"""
+    current_password: str = Field(..., description="Current password")
+    new_password: str = Field(
+        ..., 
+        min_length=8, 
+        max_length=128, 
+        description="New password (minimum 8 characters, must contain letters and numbers)",
+        examples=["newpassword123", "securepass456", "changepass789"]
+    )
+
+    @field_validator('new_password')
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        """Validate password strength"""
+        if not value:
+            raise ValueError('Password is required')
+        
+        if len(value) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        
+        if len(value) > 128:
+            raise ValueError('Password must be less than 128 characters')
+        
+        # Check for at least one letter and one number
+        if not re.search(r'[A-Za-z]', value):
+            raise ValueError('Password must contain at least one letter')
+        
+        if not re.search(r'\d', value):
+            raise ValueError('Password must contain at least one number')
+        
+        return value
+
+# Response Schemas
+class MessageResponse(BaseModel):
+    """Generic message response"""
+    message: str = Field(..., description="Response message")
+    success: bool = Field(default=True, description="Whether the operation was successful")
 
 # Update forward references
 ProjectWithTasks.model_rebuild()

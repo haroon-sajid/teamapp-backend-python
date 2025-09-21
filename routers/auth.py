@@ -10,10 +10,15 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+import secrets
+import string
 
 from database import get_db
 from models import User, UserRole
-from schemas import UserCreate, UserResponse, Token, TokenData, UserLogin
+from schemas import (
+    UserCreate, UserResponse, Token, TokenData, UserLogin,
+    PasswordResetRequest, PasswordReset, PasswordChange, MessageResponse
+)
 
 # Router instance
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -38,6 +43,16 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 def get_password_hash(password: str) -> str:
     """Hash a password using bcrypt"""
     return pwd_context.hash(password)
+
+def generate_reset_token() -> str:
+    """Generate a secure password reset token"""
+    return secrets.token_urlsafe(32)
+
+def is_reset_token_valid(expires_at: Optional[datetime]) -> bool:
+    """Check if a reset token is still valid"""
+    if not expires_at:
+        return False
+    return datetime.now(timezone.utc) < expires_at
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """
@@ -147,7 +162,11 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
     if db_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
+            detail={
+                "error": "Email already registered",
+                "message": "An account with this email address already exists. Please use a different email or try logging in.",
+                "field": "email"
+            }
         )
     
     # Check if user with this username already exists
@@ -155,7 +174,11 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
     if db_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already taken"
+            detail={
+                "error": "Username already taken",
+                "message": "This username is already taken. Please choose a different username.",
+                "field": "username"
+            }
         )
     
     # Create new user with hashed password
@@ -198,10 +221,25 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     ).first()
     
     # Verify user exists and password is correct
-    if not user or not verify_password(form_data.password, user.hashed_password):
+    if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            detail={
+                "error": "User not found",
+                "message": "No account found with this email or username. Please check your credentials or sign up for a new account.",
+                "field": "username"
+            },
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    if not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "error": "Incorrect password",
+                "message": "The password you entered is incorrect. Please try again or use 'Forgot Password' to reset it.",
+                "field": "password"
+            },
             headers={"WWW-Authenticate": "Bearer"},
         )
     
@@ -239,10 +277,25 @@ def login_json(user_credentials: UserLogin, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == user_credentials.email).first()
     
     # Verify user exists and password is correct
-    if not user or not verify_password(user_credentials.password, user.hashed_password):
+    if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            detail={
+                "error": "User not found",
+                "message": "No account found with this email address. Please check your email or sign up for a new account.",
+                "field": "email"
+            },
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    if not verify_password(user_credentials.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "error": "Incorrect password",
+                "message": "The password you entered is incorrect. Please try again or use 'Forgot Password' to reset it.",
+                "field": "password"
+            },
             headers={"WWW-Authenticate": "Bearer"},
         )
     
@@ -273,3 +326,133 @@ def get_current_user_info(current_user: User = Depends(get_current_user)):
         Current user information
     """
     return current_user
+
+@router.post("/forgot-password", response_model=MessageResponse)
+def forgot_password(request: PasswordResetRequest, db: Session = Depends(get_db)):
+    """
+    Request a password reset.
+    
+    This endpoint generates a reset token and stores it in the database.
+    In a real application, you would send this token via email.
+    
+    Args:
+        request: Email address for password reset
+        db: Database session
+    
+    Returns:
+        Success message (always returns success for security)
+    """
+    # Find user by email
+    user = db.query(User).filter(User.email == request.email).first()
+    
+    if user:
+        # Generate reset token and set expiration (1 hour from now)
+        reset_token = generate_reset_token()
+        reset_token_expires = datetime.now(timezone.utc) + timedelta(hours=1)
+        
+        # Update user with reset token
+        user.reset_token = reset_token
+        user.reset_token_expires = reset_token_expires
+        db.commit()
+        
+        # In a real application, you would send an email here
+        # For now, we'll just return the token in the response for testing
+        return MessageResponse(
+            message=f"Password reset token generated. In production, this would be sent to your email. Token: {reset_token}",
+            success=True
+        )
+    
+    # Always return success for security (don't reveal if email exists)
+    return MessageResponse(
+        message="If an account with this email exists, a password reset link has been sent.",
+        success=True
+    )
+
+@router.post("/reset-password", response_model=MessageResponse)
+def reset_password(request: PasswordReset, db: Session = Depends(get_db)):
+    """
+    Reset password using a reset token.
+    
+    Args:
+        request: Reset token and new password
+        db: Database session
+    
+    Returns:
+        Success message
+    """
+    # Find user by reset token
+    user = db.query(User).filter(User.reset_token == request.token).first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error": "Invalid reset token",
+                "message": "The reset token is invalid or has expired. Please request a new password reset.",
+                "field": "token"
+            }
+        )
+    
+    # Check if token is still valid
+    if not is_reset_token_valid(user.reset_token_expires):
+        # Clear the expired token
+        user.reset_token = None
+        user.reset_token_expires = None
+        db.commit()
+        
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error": "Reset token expired",
+                "message": "The reset token has expired. Please request a new password reset.",
+                "field": "token"
+            }
+        )
+    
+    # Update password and clear reset token
+    user.hashed_password = get_password_hash(request.new_password)
+    user.reset_token = None
+    user.reset_token_expires = None
+    db.commit()
+    
+    return MessageResponse(
+        message="Password has been successfully reset. You can now log in with your new password.",
+        success=True
+    )
+
+@router.post("/change-password", response_model=MessageResponse)
+def change_password(
+    request: PasswordChange, 
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Change password for authenticated user.
+    
+    Args:
+        request: Current password and new password
+        current_user: The current authenticated user
+        db: Database session
+    
+    Returns:
+        Success message
+    """
+    # Verify current password
+    if not verify_password(request.current_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error": "Incorrect current password",
+                "message": "The current password you entered is incorrect. Please try again.",
+                "field": "current_password"
+            }
+        )
+    
+    # Update password
+    current_user.hashed_password = get_password_hash(request.new_password)
+    db.commit()
+    
+    return MessageResponse(
+        message="Password has been successfully changed.",
+        success=True
+    )
