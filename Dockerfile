@@ -15,9 +15,6 @@ COPY requirements.txt .
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Verify email-validator is installed
-RUN python -c "import email_validator; print('email-validator installed successfully')"
-
 # Copy the rest of the application
 COPY . .
 

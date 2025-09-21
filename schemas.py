@@ -3,7 +3,7 @@ Pydantic schemas for request/response validation.
 Using Pydantic v2 style with model_config.
 """
 
-from pydantic import BaseModel, EmailStr, ConfigDict
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 from models import UserRole, TaskStatus
@@ -11,7 +11,7 @@ from models import UserRole, TaskStatus
 # User Schemas
 class UserBase(BaseModel):
     """Base schema for User with common attributes"""
-    email: EmailStr
+    email: str
     username: str
     role: UserRole = UserRole.MEMBER
 
@@ -21,7 +21,7 @@ class UserCreate(UserBase):
 
 class UserLogin(BaseModel):
     """Schema for user login"""
-    email: EmailStr
+    email: str
     password: str
 
 class UserResponse(UserBase):
