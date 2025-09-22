@@ -53,7 +53,7 @@ pip install -r requirements.txt
 
 ### 4. Run the application
 ```bash
-uvicorn main:app --reload
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 The API will be available at `http://localhost:8000`
@@ -200,6 +200,7 @@ For production deployment, configure these environment variables:
 - `SECRET_KEY`: JWT signing secret key
 - `DATABASE_URL`: Database connection string
 - `CORS_ORIGINS`: Allowed CORS origins
+- `ENVIRONMENT`: Set to "production" for production environment
 
 ### Security Considerations
 - Change the default JWT secret key in production
@@ -211,6 +212,7 @@ For production deployment, configure these environment variables:
 
 ### Running in Development Mode
 ```bash
+# Make sure to bind to 0.0.0.0 so it's accessible from other containers/hosts
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
@@ -239,6 +241,11 @@ To reset the database, delete the `kanban_board.db` file and restart the server.
    - Delete `kanban_board.db` to reset database
    - Check file permissions
    - Verify SQLite installation
+
+5. **CORS Errors**
+   - Check that CORS is properly configured in `main.py`
+   - Ensure the frontend URL is in the allowed origins list
+   - Verify the backend is running on the correct port
 
 ## API Response Format
 

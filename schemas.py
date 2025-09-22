@@ -37,13 +37,13 @@ class UserBase(BaseModel):
     def validate_email(cls, value: str) -> str:
         """Validate email format using regex pattern"""
         if not value:
-            raise ValueError('Email is required')
+            raise ValueError('Please enter your email address')
         
         # Comprehensive email regex pattern
         email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
         
         if not re.match(email_pattern, value):
-            raise ValueError('Invalid email format. Please provide a valid email address.')
+            raise ValueError('Please enter a valid email address (e.g., user@example.com)')
         
         # Additional checks
         if value.count('@') != 1:
@@ -51,10 +51,10 @@ class UserBase(BaseModel):
         
         local, domain = value.split('@')
         if len(local) > 64:
-            raise ValueError('Email local part is too long')
+            raise ValueError('Email address is too long. Please use a shorter email address.')
         
         if len(domain) > 255:
-            raise ValueError('Email domain is too long')
+            raise ValueError('Email domain is too long. Please use a different email address.')
         
         return value.lower().strip()
 
@@ -63,7 +63,7 @@ class UserBase(BaseModel):
     def validate_username(cls, value: str) -> str:
         """Validate username format"""
         if not value:
-            raise ValueError('Username is required')
+            raise ValueError('Please enter a username')
         
         # Username should contain only alphanumeric characters, underscores, and hyphens
         if not re.match(r'^[a-zA-Z0-9_-]+$', value):
@@ -86,13 +86,13 @@ class UserCreate(UserBase):
     def validate_password(cls, value: str) -> str:
         """Validate password strength"""
         if not value:
-            raise ValueError('Password is required')
+            raise ValueError('Please enter a password')
         
         if len(value) < 8:
             raise ValueError('Password must be at least 8 characters long')
         
         if len(value) > 128:
-            raise ValueError('Password must be less than 128 characters')
+            raise ValueError('Password is too long. Please use a shorter password (less than 128 characters)')
         
         # Check for at least one letter and one number
         if not re.search(r'[A-Za-z]', value):
@@ -146,13 +146,19 @@ class UserResponse(UserBase):
 class Token(BaseModel):
     """Schema for JWT token response"""
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
+    expires_in: int = 3600  # 60 minutes in seconds
 
 class TokenData(BaseModel):
     """Schema for data stored in JWT token"""
     user_id: int
     email: str
     role: UserRole
+
+class RefreshTokenRequest(BaseModel):
+    """Schema for refresh token request"""
+    refresh_token: str = Field(..., description="The refresh token")
 
 # Project Schemas
 class ProjectBase(BaseModel):
