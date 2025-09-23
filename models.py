@@ -22,6 +22,13 @@ class TaskStatus(str, enum.Enum):
     IN_PROGRESS = "in_progress"
     DONE = "done"
 
+# Enum for team member roles
+class TeamMemberRole(str, enum.Enum):
+    """Enum defining roles within a team"""
+    MEMBER = "member"
+    LEAD = "lead"
+    ADMIN = "admin"
+
 class User(Base):
     """
     User model representing users in the system.
@@ -40,10 +47,6 @@ class User(Base):
     # Role can be either 'admin' or 'member'
     role = Column(SQLEnum(UserRole), default=UserRole.MEMBER, nullable=False)
     
-    # Password reset fields
-    reset_token = Column(String, nullable=True, unique=True, index=True)
-    reset_token_expires = Column(DateTime(timezone=True), nullable=True)
-    
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -53,6 +56,8 @@ class User(Base):
     created_projects = relationship("Project", back_populates="creator", cascade="all, delete-orphan")
     # A user can be assigned to many tasks
     assigned_tasks = relationship("Task", back_populates="assignee")
+    # A user can be a member of many teams
+    team_memberships = relationship("TeamMember", back_populates="user", cascade="all, delete-orphan")
 
 class Project(Base):
     """
@@ -68,8 +73,9 @@ class Project(Base):
     name = Column(String, nullable=False)
     description = Column(String, nullable=True)
     
-    # Foreign key to User who created the project
+    # Foreign keys
     creator_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    team_id = Column(Integer, ForeignKey("teams.id"), nullable=False)
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -78,6 +84,8 @@ class Project(Base):
     # Relationships
     # Link back to the user who created this project
     creator = relationship("User", back_populates="created_projects")
+    # Link to the team this project belongs to
+    team = relationship("Team", back_populates="projects")
     # A project can have many tasks
     tasks = relationship("Task", back_populates="project", cascade="all, delete-orphan")
 
@@ -109,3 +117,47 @@ class Task(Base):
     project = relationship("Project", back_populates="tasks")
     # Link to the user assigned to this task (if any)
     assignee = relationship("User", back_populates="assigned_tasks")
+
+class Team(Base):
+    """
+    Team model representing teams in the system.
+    Teams can contain multiple users and have their own projects.
+    """
+    __tablename__ = "teams"
+    
+    # Primary key
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # Team information
+    name = Column(String, nullable=False, unique=True, index=True)
+    description = Column(String, nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    # A team can have many members
+    team_memberships = relationship("TeamMember", back_populates="team", cascade="all, delete-orphan")
+    # A team can have many projects
+    projects = relationship("Project", back_populates="team", cascade="all, delete-orphan")
+
+class TeamMember(Base):
+    """
+    TeamMember association model representing the relationship between users and teams.
+    This allows users to be members of multiple teams with different roles.
+    """
+    __tablename__ = "team_members"
+    
+    # Composite primary key
+    team_id = Column(Integer, ForeignKey("teams.id"), primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
+    
+    # Role within the team (optional, defaults to member)
+    role = Column(SQLEnum(TeamMemberRole), default=TeamMemberRole.MEMBER, nullable=False)
+    
+    # Timestamps
+    joined_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    team = relationship("Team", back_populates="team_memberships")
+    user = relationship("User", back_populates="team_memberships")

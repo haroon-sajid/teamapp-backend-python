@@ -5,10 +5,11 @@ Includes task assignment functionality.
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 from typing import List, Optional
 
 from database import get_db
-from models import Task, User, Project, UserRole, TaskStatus
+from models import Task, User, Project, UserRole, TaskStatus, TeamMember
 from schemas import TaskCreate, TaskUpdate, TaskResponse, TaskAssign
 from routers.auth import get_current_user
 
@@ -21,36 +22,33 @@ def check_project_permission(
     db: Session
 ) -> Project:
     """
-    Helper function to check if user has permission to access a project.
-    
-    Args:
-        project_id: The ID of the project
-        current_user: The authenticated user
-        db: Database session
-    
-    Returns:
-        The project if user has permission
-    
-    Raises:
-        HTTPException: If project not found or user doesn't have permission
+    Verify the current user can access the given project.
+
+    Admins: access to all projects.
+    Members: must belong to the team's project.
     """
     project = db.query(Project).filter(Project.id == project_id).first()
-    
+
     if not project:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Project not found"
         )
-    
-    # Check permissions: Admin can access all, others can only access their own
-    if current_user.role != UserRole.ADMIN and project.creator_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to access this project"
-        )
-    
+
+    if current_user.role != UserRole.ADMIN:
+        team_member = db.query(TeamMember).filter(
+            TeamMember.team_id == project.team_id,
+            TeamMember.user_id == current_user.id
+        ).first()
+        if not team_member:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to access this project"
+            )
+
     return project
 
+@router.get("", response_model=List[TaskResponse])
 @router.get("/", response_model=List[TaskResponse])
 def get_all_tasks(
     skip: int = 0,
@@ -63,6 +61,11 @@ def get_all_tasks(
 ):
     """
     Get all tasks with optional filters.
+    
+    **Access Control:**
+    - Admin users can see all tasks
+    - Member users can only see tasks assigned to them from projects in their teams
+    - If assigned_to_me is True, only show tasks assigned to current user
     
     Args:
         skip: Number of tasks to skip (for pagination)
@@ -79,18 +82,24 @@ def get_all_tasks(
     # Start with base query
     query = db.query(Task)
     
-    # Apply filters
-    if project_id:
-        # Check project permission
-        check_project_permission(project_id, current_user, db)
-        query = query.filter(Task.project_id == project_id)
-    elif current_user.role != UserRole.ADMIN:
-        # Non-admin users can only see tasks from their projects
-        user_projects = db.query(Project.id).filter(
-            Project.creator_id == current_user.id
-        ).subquery()
-        query = query.filter(Task.project_id.in_(user_projects))
+    # Apply access control based on user role
+    if current_user.role == UserRole.ADMIN:
+        # Admins can see all tasks
+        if project_id:
+            # Check project permission (admins can access any project)
+            check_project_permission(project_id, current_user, db)
+            query = query.filter(Task.project_id == project_id)
+    else:
+        # Member users can see tasks assigned to them (regardless of team/project)
+        # This allows admins to assign tasks from any project to any user
+        query = query.filter(Task.assignee_id == current_user.id)
+        
+        if project_id:
+            # If a specific project is requested, also filter by project
+            # But only if the user has tasks in that project
+            query = query.filter(Task.project_id == project_id)
     
+    # Apply additional filters
     if status:
         query = query.filter(Task.status == status)
     
@@ -110,6 +119,10 @@ def get_task(
 ):
     """
     Get a specific task by ID.
+    
+    **Access Control:**
+    - Admin users can see any task
+    - Member users can only see tasks assigned to them
     
     Args:
         task_id: The ID of the task to retrieve
@@ -131,8 +144,12 @@ def get_task(
             detail="Task not found"
         )
     
-    # Check project permission
-    check_project_permission(task.project_id, current_user, db)
+    # Access control: Admins can see any task, Members can only see tasks assigned to them
+    if current_user.role != UserRole.ADMIN and task.assignee_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only view tasks assigned to you"
+        )
     
     return task
 
@@ -156,15 +173,31 @@ def create_task(
     Raises:
         HTTPException: If project not found or user doesn't have permission
     """
-    # Check project permission
-    check_project_permission(task.project_id, current_user, db)
+    # Verify the project exists (basic validation)
+    project = db.query(Project).filter(Project.id == task.project_id).first()
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found"
+        )
+    
+    # Check assignment permissions
+    if task.assignee_id is not None:
+        # Verify the assignee exists
+        assignee = db.query(User).filter(User.id == task.assignee_id).first()
+        if not assignee:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
     
     # Create new task
     db_task = Task(
         title=task.title,
         description=task.description,
         status=task.status,
-        project_id=task.project_id
+        project_id=task.project_id,
+        assignee_id=task.assignee_id
     )
     
     # Save to database
@@ -183,6 +216,10 @@ def update_task(
 ):
     """
     Update a task.
+    
+    **Access Control:**
+    - Admin users can update any task
+    - Member users can only update tasks assigned to them
     
     Args:
         task_id: The ID of the task to update
@@ -205,8 +242,22 @@ def update_task(
             detail="Task not found"
         )
     
-    # Check project permission
-    check_project_permission(task.project_id, current_user, db)
+    # Access control: Admins can update any task, Members can only update tasks assigned to them
+    if current_user.role != UserRole.ADMIN and task.assignee_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only update tasks assigned to you"
+        )
+    
+    # Check assignment permissions if assignee is being updated
+    if task_update.assignee_id is not None:
+        # Verify the assignee exists
+        assignee = db.query(User).filter(User.id == task_update.assignee_id).first()
+        if not assignee:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
     
     # Update task fields if provided
     if task_update.title is not None:
@@ -215,11 +266,47 @@ def update_task(
         task.description = task_update.description
     if task_update.status is not None:
         task.status = task_update.status
+    if task_update.assignee_id is not None:
+        task.assignee_id = task_update.assignee_id
     
     # Save changes
     db.commit()
     db.refresh(task)
     
+    return task
+
+@router.patch("/{task_id}/status", response_model=TaskResponse)
+def update_task_status(
+    task_id: int,
+    status: TaskStatus,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update only the status of a task.
+    
+    **Access Control:**
+    - Admin users can update any task status
+    - Member users can only update status of tasks assigned to them
+    """
+    task = db.query(Task).filter(Task.id == task_id).first()
+
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Task not found"
+        )
+
+    # Access control: Admins can update any task status, Members can only update tasks assigned to them
+    if current_user.role != UserRole.ADMIN and task.assignee_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only update status of tasks assigned to you"
+        )
+
+    task.status = status
+    db.commit()
+    db.refresh(task)
     return task
 
 @router.delete("/{task_id}")
@@ -230,6 +317,10 @@ def delete_task(
 ):
     """
     Delete a task.
+    
+    **Access Control:**
+    - Only admin users can delete tasks
+    - Member users cannot delete tasks
     
     Args:
         task_id: The ID of the task to delete
@@ -242,6 +333,13 @@ def delete_task(
     Raises:
         HTTPException: If task not found or user doesn't have permission
     """
+    # Only admins can delete tasks
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can delete tasks"
+        )
+    
     # Find the task
     task = db.query(Task).filter(Task.id == task_id).first()
     
@@ -251,8 +349,7 @@ def delete_task(
             detail="Task not found"
         )
     
-    # Check project permission
-    check_project_permission(task.project_id, current_user, db)
+    # No additional project permission check needed for deletion - admin-only operation
     
     # Delete the task
     db.delete(task)
@@ -291,8 +388,7 @@ def assign_task(
             detail="Task not found"
         )
     
-    # Check project permission
-    check_project_permission(task.project_id, current_user, db)
+    # For task assignment, only check if user has permission to assign tasks (admin or task creator)
     
     # Find the user to assign to
     assignee = db.query(User).filter(User.id == user_id).first()
@@ -341,8 +437,7 @@ def unassign_task(
             detail="Task not found"
         )
     
-    # Check project permission
-    check_project_permission(task.project_id, current_user, db)
+    # For task assignment, only check if user has permission to assign tasks (admin or task creator)
     
     # Remove assignment
     task.assignee_id = None

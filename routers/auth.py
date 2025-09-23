@@ -11,14 +11,13 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-import secrets
-import string
+import os
 
 from database import get_db
 from models import User, UserRole
 from schemas import (
-    UserCreate, UserResponse, Token, TokenData, UserLogin,
-    PasswordResetRequest, PasswordReset, PasswordChange, MessageResponse,
+    UserCreate, UserResponse, Token, TokenData, UserLogin, UserLoginFlexible,
+    PasswordChange, MessageResponse,
     RefreshTokenRequest
 )
 
@@ -26,10 +25,10 @@ from schemas import (
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 # Security configuration
-# Secret key for JWT - In production, use environment variable!
-SECRET_KEY = "your-secret-key-here-change-in-production"
+# Secret key for JWT - configurable via environment
+SECRET_KEY = os.getenv("SECRET_KEY", "your-super-secret-jwt-key-change-this-in-production")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60  # Increased from 30 to 60 minutes for better UX
+ACCESS_TOKEN_EXPIRE_MINUTES = 15  # Short-lived access token for security
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -46,15 +45,6 @@ def get_password_hash(password: str) -> str:
     """Hash a password using bcrypt"""
     return pwd_context.hash(password)
 
-def generate_reset_token() -> str:
-    """Generate a secure password reset token"""
-    return secrets.token_urlsafe(32)
-
-def is_reset_token_valid(expires_at: Optional[datetime]) -> bool:
-    """Check if a reset token is still valid"""
-    if not expires_at:
-        return False
-    return datetime.now(timezone.utc) < expires_at
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """
@@ -258,7 +248,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={
                 "error": "Incorrect password",
-                "message": "The password you entered is incorrect. Please try again or use 'Forgot Password' to reset it.",
+                "message": "The password you entered is incorrect. Please try again.",
                 "field": "password"
             },
             headers={"WWW-Authenticate": "Bearer"},
@@ -319,7 +309,7 @@ def login_json(user_credentials: UserLogin, db: Session = Depends(get_db)):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={
                 "error": "Incorrect password",
-                "message": "The password you entered is incorrect. Please try again or use 'Forgot Password' to reset it.",
+                "message": "The password you entered is incorrect. Please try again.",
                 "field": "password"
             },
             headers={"WWW-Authenticate": "Bearer"},
@@ -342,6 +332,91 @@ def login_json(user_credentials: UserLogin, db: Session = Depends(get_db)):
         "token_type": "bearer",
         "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60  # Convert to seconds
     }
+
+@router.post("/login-email", response_model=Token)
+def login_email(user_credentials: UserLoginFlexible, db: Session = Depends(get_db)):
+    """
+    Login endpoint that accepts email or username in JSON format.
+    
+    This endpoint is designed for frontend applications and accepts both
+    email addresses and usernames for login.
+    
+    Args:
+        user_credentials: Email/username and password in JSON format
+        db: Database session
+    
+    Returns:
+        JWT access token
+    
+    Raises:
+        HTTPException: If credentials are invalid
+    """
+    # Try to find user by email first, then by username
+    user = db.query(User).filter(
+        or_(User.email == user_credentials.email_or_username, User.username == user_credentials.email_or_username)
+    ).first()
+    
+    # Verify user exists and password is correct
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "error": "User not found",
+                "message": "No account found with this email or username. Please check your credentials or sign up for a new account.",
+                "field": "email_or_username"
+            },
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    if not verify_password(user_credentials.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "error": "Incorrect password",
+                "message": "The password you entered is incorrect. Please try again.",
+                "field": "password"
+            },
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Create access and refresh tokens
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    token_data = {
+        "user_id": user.id,
+        "email": user.email,
+        "role": user.role.value
+    }
+    
+    access_token = create_access_token(data=token_data, expires_delta=access_token_expires)
+    refresh_token = create_refresh_token(data=token_data)
+    
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60  # Convert to seconds
+    }
+
+@router.post("/login-username", response_model=Token)
+def login_username(user_credentials: UserLoginFlexible, db: Session = Depends(get_db)):
+    """
+    Login endpoint that accepts email or username in JSON format.
+    
+    This is an alias for /login-email for backward compatibility.
+    Both endpoints work identically and accept both email and username.
+    
+    Args:
+        user_credentials: Email/username and password in JSON format
+        db: Database session
+    
+    Returns:
+        JWT access token
+    
+    Raises:
+        HTTPException: If credentials are invalid
+    """
+    # Delegate to the main flexible login endpoint
+    return login_email(user_credentials, db)
 
 @router.post("/refresh", response_model=Token)
 def refresh_token(request: RefreshTokenRequest, db: Session = Depends(get_db)):
@@ -435,98 +510,6 @@ def get_current_user_info(current_user: User = Depends(get_current_user)):
     """
     return current_user
 
-@router.post("/forgot-password", response_model=MessageResponse)
-def forgot_password(request: PasswordResetRequest, db: Session = Depends(get_db)):
-    """
-    Request a password reset.
-    
-    This endpoint generates a reset token and stores it in the database.
-    In a real application, you would send this token via email.
-    
-    Args:
-        request: Email address for password reset
-        db: Database session
-    
-    Returns:
-        Success message (always returns success for security)
-    """
-    # Find user by email
-    user = db.query(User).filter(User.email == request.email).first()
-    
-    if user:
-        # Generate reset token and set expiration (1 hour from now)
-        reset_token = generate_reset_token()
-        reset_token_expires = datetime.now(timezone.utc) + timedelta(hours=1)
-        
-        # Update user with reset token
-        user.reset_token = reset_token
-        user.reset_token_expires = reset_token_expires
-        db.commit()
-        
-        # In a real application, you would send an email here
-        # For now, we'll just return the token in the response for testing
-        return MessageResponse(
-            message=f"Password reset token generated. In production, this would be sent to your email. Token: {reset_token}",
-            success=True
-        )
-    
-    # Always return success for security (don't reveal if email exists)
-    return MessageResponse(
-        message="If an account with this email exists, a password reset link has been sent.",
-        success=True
-    )
-
-@router.post("/reset-password", response_model=MessageResponse)
-def reset_password(request: PasswordReset, db: Session = Depends(get_db)):
-    """
-    Reset password using a reset token.
-    
-    Args:
-        request: Reset token and new password
-        db: Database session
-    
-    Returns:
-        Success message
-    """
-    # Find user by reset token
-    user = db.query(User).filter(User.reset_token == request.token).first()
-    
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "error": "Invalid reset token",
-                "message": "The reset token is invalid or has expired. Please request a new password reset.",
-                "field": "token"
-            }
-        )
-    
-    # Check if token is still valid
-    if not is_reset_token_valid(user.reset_token_expires):
-        # Clear the expired token
-        user.reset_token = None
-        user.reset_token_expires = None
-        db.commit()
-        
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "error": "Reset token expired",
-                "message": "The reset token has expired. Please request a new password reset.",
-                "field": "token"
-            }
-        )
-    
-    # Update password and clear reset token
-    user.hashed_password = get_password_hash(request.new_password)
-    user.reset_token = None
-    user.reset_token_expires = None
-    db.commit()
-    
-    return MessageResponse(
-        message="Password has been successfully reset. You can now log in with your new password.",
-        success=True
-    )
 
 @router.post("/change-password", response_model=MessageResponse)
 def change_password(

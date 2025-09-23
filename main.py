@@ -13,12 +13,21 @@ from pydantic import ValidationError
 # Import database components
 from database import engine, Base
 
-# Import routers
-from routers import auth, projects, tasks
+# Import models to ensure they are registered with SQLAlchemy
+import models
 
-# Create database tables
+# Import routers
+from routers import auth, projects, tasks, users, teams
+
+# Create database tables and ensure schema is current
 # This will create all tables defined in models.py if they don't exist
-Base.metadata.create_all(bind=engine)
+# and handle schema migrations for existing databases
+try:
+    from database_setup import create_tables
+    create_tables()
+except ImportError:
+    # Fallback to basic table creation
+    Base.metadata.create_all(bind=engine)
 
 # Create FastAPI app instance
 app = FastAPI(
@@ -167,29 +176,30 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 # In production, replace "*" with your frontend URL for security
 environment = os.getenv("ENVIRONMENT", "development")
 allowed_origins = [
-    "http://localhost:3000",  # For local development
-    "http://127.0.0.1:3000",  # Alternative localhost
-    "https://teamapp-backend-python-1.onrender.com",  # Production backend
-] if environment == "development" else [
-    "https://your-frontend-domain.com",  # Replace with your actual frontend URL
-    "http://localhost:3000",  # For local development
-    "https://teamapp-backend-python-1.onrender.com",  # Production backend
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    os.getenv("FRONTEND_URL", "http://localhost:3000"),
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all HTTP methods
-    allow_headers=["*"],  # Allows all headers
-    expose_headers=["Access-Control-Allow-Origin"]
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=["*"],
+    expose_headers=["*"]
 )
+
 
 # Include routers
 # Each router handles a specific set of endpoints
 app.include_router(auth.router)
 app.include_router(projects.router)
 app.include_router(tasks.router)
+app.include_router(users.router)
+app.include_router(teams.router)
 
 # Root endpoint
 @app.get("/")
@@ -206,6 +216,8 @@ def root():
             "auth": "/auth - Authentication endpoints (signup, login)",
             "projects": "/projects - Project management endpoints",
             "tasks": "/tasks - Task management endpoints",
+            "teams": "/teams - Team management endpoints",
+            "users": "/users - User management endpoints",
             "docs": "/docs - Interactive API documentation",
             "redoc": "/redoc - Alternative API documentation"
         }
@@ -248,4 +260,5 @@ if __name__ == "__main__":
     import uvicorn
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", 8000))
-    uvicorn.run(app, host=host, port=port, reload=True)
+    uvicorn.run(app, host="0.0.0.0", port=port, reload=True)
+    # uvicorn.run(app, host=host, port=port, reload=True)
