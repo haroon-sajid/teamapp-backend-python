@@ -18,8 +18,6 @@ import models
 
 # Import routers
 from routers import auth, projects, tasks, users, teams
-
-# Create database tables and ensure schema is current
 try:
     from database_setup import create_tables
     create_tables()
@@ -86,7 +84,6 @@ import os
 # Parse CORS origins from environment variable
 cors_origin_env = os.getenv("CORS_ORIGIN")
 if cors_origin_env:
-    # Parse CSV format: "http://localhost:3000,https://teamapp-frontend-react.vercel.app"
     allowed_origins = [origin.strip() for origin in cors_origin_env.split(',')]
 else:
     # Fallback to default origins for development
@@ -94,7 +91,6 @@ else:
         # "http://localhost:3000",
         # "http://127.0.0.1:3000",
         # "https://teamapp-frontend-react.vercel.app",
-        # "https://teamapp-frontend-react-4q6ea3ipa-haroons-projects-41fe01b2.vercel.app",
     ]
 
 app.add_middleware(
