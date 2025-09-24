@@ -26,7 +26,7 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 # Security configuration
 # Secret key for JWT - configurable via environment
-SECRET_KEY = os.getenv("SECRET_KEY", "your-super-secret-jwt-key-change-this-in-production")
+SECRET_KEY = os.getenv("JWT_SECRET", os.getenv("SECRET_KEY", "your-super-secret-jwt-key-change-this-in-production"))
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 15  # Short-lived access token for security
 

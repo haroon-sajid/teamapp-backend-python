@@ -83,24 +83,27 @@ import os
 
 # Parse CORS origins from environment variable
 cors_origin_env = os.getenv("CORS_ORIGIN")
-if cors_origin_env:
-    allowed_origins = [origin.strip() for origin in cors_origin_env.split(',')]
-else:
-    # Fallback to default origins for development
-    allowed_origins = ["*"
-        # "http://localhost:3000",
-        # "http://127.0.0.1:3000",
-        # "https://teamapp-frontend-react.vercel.app",
-    ]
 
+if cors_origin_env:
+    # Split multiple origins by comma and strip spaces
+    allowed_origins = [origin.strip() for origin in cors_origin_env.split(',')]
+    allow_credentials = True
+else:
+    # Fallback for local development only
+    allowed_origins = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000"
+    ]
+    allow_credentials = True
+
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_credentials=True,
+    allow_origins=allowed_origins,  # Must not be ["*"] if allow_credentials=True
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 # ----------------------
 # Routers
