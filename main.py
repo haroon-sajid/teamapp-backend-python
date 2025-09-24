@@ -90,11 +90,11 @@ if cors_origin_env:
     allowed_origins = [origin.strip() for origin in cors_origin_env.split(',')]
 else:
     # Fallback to default origins for development
-    allowed_origins = [
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "https://teamapp-frontend-react.vercel.app",
-        "https://teamapp-frontend-react-4q6ea3ipa-haroons-projects-41fe01b2.vercel.app"
+    allowed_origins = ["*"
+        # "http://localhost:3000",
+        # "http://127.0.0.1:3000",
+        # "https://teamapp-frontend-react.vercel.app",
+        # "https://teamapp-frontend-react-4q6ea3ipa-haroons-projects-41fe01b2.vercel.app",
     ]
 
 app.add_middleware(
