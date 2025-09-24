@@ -175,13 +175,15 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 # This allows the frontend to communicate with the backend
 # In production, replace "*" with your frontend URL for security
 environment = os.getenv("ENVIRONMENT", "development")
-allowed_origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    os.getenv("FRONTEND_URL", "http://localhost:3000"),
-]
+# Get CORS origins from environment variable, with fallback to localhost for development
+cors_origin_env = os.getenv("CORS_ORIGIN", "http://localhost:3000")
+allowed_origins = cors_origin_env.split(",") if cors_origin_env else ["http://localhost:3000"]
+
+# Add localhost fallbacks for development if not already present
+if "http://localhost:3000" not in allowed_origins:
+    allowed_origins.append("http://localhost:3000")
+if "http://127.0.0.1:3000" not in allowed_origins:
+    allowed_origins.append("http://127.0.0.1:3000")
 
 app.add_middleware(
     CORSMiddleware,
