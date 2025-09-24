@@ -39,7 +39,7 @@ def migrate_projects_add_team_id():
                     result = conn.execute(text("PRAGMA table_info(projects)"))
                     columns = [row[1] for row in result.fetchall()]
                     if 'team_id' in columns:
-                        print("✅ team_id column already exists in projects table")
+                        print(" team_id column already exists in projects table")
                         trans.rollback()
                         return True
                 else:
@@ -50,7 +50,7 @@ def migrate_projects_add_team_id():
                         WHERE table_name = 'projects' AND column_name = 'team_id'
                     """))
                     if result.fetchone():
-                        print("✅ team_id column already exists in projects table")
+                        print(" team_id column already exists in projects table")
                         trans.rollback()
                         return True
                 
@@ -61,7 +61,7 @@ def migrate_projects_add_team_id():
                     result = conn.execute(text("SELECT tablename FROM pg_tables WHERE tablename='projects'"))
                 
                 if not result.fetchone():
-                    print("⚠️  Projects table doesn't exist yet. Migration not needed.")
+                    print("  Projects table doesn't exist yet. Migration not needed.")
                     trans.rollback()
                     return True
                 
@@ -74,7 +74,7 @@ def migrate_projects_add_team_id():
                 teams_table_exists = result.fetchone() is not None
                 
                 if not teams_table_exists:
-                    print("❌ Teams table doesn't exist. Please run create_teams_table.py first.")
+                    print(" Teams table doesn't exist. Please run create_teams_table.py first.")
                     trans.rollback()
                     return False
                 
@@ -107,7 +107,7 @@ def migrate_projects_add_team_id():
                             """))
                         
                         default_team_id = result.fetchone()[0]
-                        print(f"✅ Created default team with ID: {default_team_id}")
+                        print(f" Created default team with ID: {default_team_id}")
                     else:
                         # Use the first existing team as default
                         result = conn.execute(text("SELECT id FROM teams ORDER BY id LIMIT 1"))
@@ -131,7 +131,7 @@ def migrate_projects_add_team_id():
                         
                         # Step 3: For SQLite, we can't easily change column to NOT NULL, so we'll leave it as is
                         # but add a foreign key constraint if possible
-                        print("⚠️  Note: SQLite limitations prevent setting NOT NULL constraint.")
+                        print("  Note: SQLite limitations prevent setting NOT NULL constraint.")
                         print("   New projects will still require team_id, but existing ones are assigned to default team.")
                     else:
                         # No existing data, can add as NOT NULL
@@ -156,19 +156,19 @@ def migrate_projects_add_team_id():
                         FOREIGN KEY (team_id) REFERENCES teams(id)
                     """))
                 
-                print("✅ Successfully added team_id column to projects table")
+                print(" Successfully added team_id column to projects table")
                 
                 if project_count > 0:
-                    print(f"✅ Assigned {project_count} existing projects to default team (ID: {default_team_id})")
+                    print(f" Assigned {project_count} existing projects to default team (ID: {default_team_id})")
                 
                 # Verify the migration
                 result = conn.execute(text("SELECT COUNT(*) FROM projects WHERE team_id IS NOT NULL"))
                 updated_count = result.fetchone()[0]
                 
                 if updated_count == project_count:
-                    print(f"✅ Migration verification successful: {updated_count} projects have team_id")
+                    print(f" Migration verification successful: {updated_count} projects have team_id")
                 else:
-                    print(f"⚠️  Migration verification warning: Only {updated_count} of {project_count} projects have team_id")
+                    print(f"  Migration verification warning: Only {updated_count} of {project_count} projects have team_id")
                 
                 trans.commit()
                 return True
@@ -178,10 +178,10 @@ def migrate_projects_add_team_id():
                 raise e
         
     except SQLAlchemyError as e:
-        print(f"❌ Database error during migration: {e}")
+        print(f" Database error during migration: {e}")
         return False
     except Exception as e:
-        print(f"❌ Error during migration: {e}")
+        print(f" Error during migration: {e}")
         return False
 
 def main():
@@ -192,7 +192,7 @@ def main():
     success = migrate_projects_add_team_id()
     
     if success:
-        print("\n🎉 Migration completed successfully!")
+        print("\n Migration completed successfully!")
         print("\nChanges made:")
         print("1. Added team_id column to projects table")
         print("2. Assigned existing projects to default team (if any)")
@@ -202,7 +202,7 @@ def main():
         print("2. All new projects will require a team_id")
         print("3. Update your frontend to include team selection")
     else:
-        print("\n💥 Migration failed")
+        print("\n Migration failed")
         print("Please check the error messages above and resolve any issues.")
         sys.exit(1)
 
