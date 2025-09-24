@@ -80,22 +80,22 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 # ----------------------
 # CORS CONFIGURATION
 # ----------------------
-# Always allow localhost for development
-default_origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000"
-]
+from fastapi.middleware.cors import CORSMiddleware
+import os
 
-# Add production frontend (Vercel)
-vercel_origin = "https://teamapp-frontend-react.vercel.app"
-preview_origin = "https://teamapp-frontend-react-4q6ea3ipa-haroons-projects-41fe01b2.vercel.app"
-
-allowed_origins = default_origins + [vercel_origin, preview_origin]
-
-# If you want dynamic control via ENV variable (optional)
+# Parse CORS origins from environment variable
 cors_origin_env = os.getenv("CORS_ORIGIN")
 if cors_origin_env:
-    allowed_origins += cors_origin_env.split(",")
+    # Parse CSV format: "http://localhost:3000,https://teamapp-frontend-react.vercel.app"
+    allowed_origins = [origin.strip() for origin in cors_origin_env.split(',')]
+else:
+    # Fallback to default origins for development
+    allowed_origins = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://teamapp-frontend-react.vercel.app",
+        "https://teamapp-frontend-react-4q6ea3ipa-haroons-projects-41fe01b2.vercel.app"
+    ]
 
 app.add_middleware(
     CORSMiddleware,
@@ -103,8 +103,8 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"]
 )
+
 
 # ----------------------
 # Routers
