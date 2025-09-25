@@ -114,7 +114,7 @@ def get_all_projects(
             joinedload(Project.team)
         )
     except Exception as e:
-        print(f"🚨 Warning: Could not load relationships, using simple query: {str(e)}")
+        print(f" Warning: Could not load relationships, using simple query: {str(e)}")
         # Fallback to simple query without joins
         query = db.query(Project)
     
@@ -151,9 +151,9 @@ def get_all_projects(
         projects = query.offset(skip).limit(limit).all()
         return projects
     except Exception as e:
-        print(f"🚨 Error executing project query: {str(e)}")
+        print(f" Error executing project query: {str(e)}")
         import traceback
-        print(f"📍 Traceback: {traceback.format_exc()}")
+        print(f" Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error retrieving projects"
@@ -263,11 +263,11 @@ def create_project(
         raise
     except Exception as e:
         db.rollback()
-        print(f"🚨 Error creating project: {str(e)}")
-        print(f"📍 Project data: {project}")
-        print(f"📍 Current user: {current_user.id}")
+        print(f" Error creating project: {str(e)}")
+        print(f" Project data: {project}")
+        print(f" Current user: {current_user.id}")
         import traceback
-        print(f"📍 Traceback: {traceback.format_exc()}")
+        print(f" Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error creating project"
