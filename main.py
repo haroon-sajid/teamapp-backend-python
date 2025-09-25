@@ -38,41 +38,24 @@ app = FastAPI(
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-	"""
-	Return a consistent, structured JSON response for validation errors so the UI
-	receives a parsed object (not a stringified dict).
-	"""
-	errors = []
-	for error in exc.errors():
-		field = error.get('loc', ['unknown'])[-1]
-		error_type = error.get('type', '')
-		# Map common validation issues to friendly messages
-		if field == 'email':
-			if error_type == 'value_error.email':
-				msg = "Please enter a valid email address."
-			else:
-				msg = "The email you entered is not valid."
-		elif field == 'username':
-			msg = "Usernames should only include letters, numbers, or underscores."
-		elif field == 'password':
-			msg = "Password must include at least 8 characters, with both letters and numbers."
-		else:
-			msg = f"The field '{field}' has invalid input."
+    errors = []
+    for error in exc.errors():
+        field = error.get('loc', ['unknown'])[-1]
+        msg = error.get('msg', 'Invalid input')   # ✅ use pydantic’s own message
 
-		errors.append({"field": str(field), "message": msg})
+        errors.append({"field": str(field), "message": msg})
 
-	first_message = errors[0]["message"] if errors else "Invalid input"
-	return JSONResponse(
-		status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-		content={
-			"success": False,
-			"error": "Validation Error",
-			"message": first_message,
-			"details": errors,
-			"status_code": status.HTTP_422_UNPROCESSABLE_ENTITY
-		}
-	)
-
+    first_message = errors[0]["message"] if errors else "Invalid input"
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={
+            "success": False,
+            "error": "Validation Error",
+            "message": first_message,
+            "details": errors,
+            "status_code": status.HTTP_422_UNPROCESSABLE_ENTITY
+        }
+    )
 
 
 @app.exception_handler(HTTPException)
