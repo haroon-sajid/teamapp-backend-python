@@ -173,39 +173,46 @@ def create_task(
     Raises:
         HTTPException: If project not found or user doesn't have permission
     """
-    # Verify the project exists (basic validation)
-    project = db.query(Project).filter(Project.id == task.project_id).first()
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Project not found"
-        )
-    
-    # Check assignment permissions
-    if task.assignee_id is not None:
-        # Verify the assignee exists
-        assignee = db.query(User).filter(User.id == task.assignee_id).first()
-        if not assignee:
+    try:
+        # Verify the project exists (basic validation)
+        project = db.query(Project).filter(Project.id == task.project_id).first()
+        if not project:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
+                detail="Project not found"
             )
-    
-    # Create new task
-    db_task = Task(
-        title=task.title,
-        description=task.description,
-        status=task.status,
-        project_id=task.project_id,
-        assignee_id=task.assignee_id
-    )
-    
-    # Save to database
-    db.add(db_task)
-    db.commit()
-    db.refresh(db_task)
-    
-    return db_task
+        
+        # Check assignment permissions
+        if task.assignee_id is not None:
+            # Verify the assignee exists
+            assignee = db.query(User).filter(User.id == task.assignee_id).first()
+            if not assignee:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="User not found"
+                )
+        
+        # Create new task
+        db_task = Task(
+            title=task.title,
+            description=task.description,
+            status=task.status,
+            project_id=task.project_id,
+            assignee_id=task.assignee_id
+        )
+        
+        # Save to database
+        db.add(db_task)
+        db.commit()
+        db.refresh(db_task)
+        
+        return db_task
+    except Exception as e:
+        db.rollback()
+        print(f"🚨 Error creating task: {str(e)}")
+        print(f"📍 Task data: {task}")
+        print(f"📍 Current user: {current_user.id}")
+        raise
 
 @router.put("/{task_id}", response_model=TaskResponse)
 def update_task(

@@ -75,6 +75,25 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     }
     return JSONResponse(status_code=exc.status_code, content=error_content)
 
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    """Global exception handler for unhandled errors"""
+    import traceback
+    
+    # Log the full error for debugging
+    print(f"🚨 Unhandled Exception: {type(exc).__name__}: {str(exc)}")
+    print(f"📍 Request URL: {request.url}")
+    print(f"📍 Request Method: {request.method}")
+    print(f"📍 Traceback: {traceback.format_exc()}")
+    
+    error_content = {
+        "error": "Internal Server Error",
+        "message": "An unexpected error occurred. Please try again later.",
+        "success": False,
+        "status_code": 500
+    }
+    return JSONResponse(status_code=500, content=error_content)
+
 # ----------------------
 # CORS CONFIGURATION
 # ----------------------
@@ -94,16 +113,28 @@ if cors_origin_env:
     additional_origins = [origin.strip() for origin in cors_origin_env.split(',')]
     allowed_origins.extend(additional_origins)
 
-print(f" CORS Configuration - Allowed Origins: {allowed_origins}")
+print(f"🔧 CORS Configuration - Allowed Origins: {allowed_origins}")
 
+# Add CORS middleware with comprehensive configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_origin_regex=r"https://.*\.vercel\.app$",
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=[
+        "Accept",
+        "Accept-Language",
+        "Content-Language",
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+        "Origin",
+        "Access-Control-Request-Method",
+        "Access-Control-Request-Headers",
+    ],
     expose_headers=["*"],
+    max_age=3600,  # Cache preflight response for 1 hour
 )
 
 
@@ -143,7 +174,15 @@ def health_check():
 # ----------------------
 @app.on_event("startup")
 async def startup_event():
-    print(" Kanban Board API is starting up...")
+    print("🚀 Kanban Board API is starting up...")
+    
+    # Initialize default team and admin user
+    try:
+        from init_default_team import create_default_team_and_admin
+        create_default_team_and_admin()
+    except Exception as e:
+        print(f"⚠️ Warning: Could not initialize default data: {str(e)}")
+        print("The application will continue, but you may need to create teams manually.")
 
 @app.on_event("shutdown")
 async def shutdown_event():

@@ -220,23 +220,30 @@ def create_project(
     Raises:
         HTTPException: If team not found or user doesn't have access
     """
-    # Verify user has access to the team
-    team = check_team_access(current_user, project.team_id, db)
-    
-    # Create new project with current user as creator and specified team
-    db_project = Project(
-        name=project.name,
-        description=project.description,
-        creator_id=current_user.id,
-        team_id=project.team_id
-    )
-    
-    # Save to database
-    db.add(db_project)
-    db.commit()
-    db.refresh(db_project)
-    
-    return db_project
+    try:
+        # Verify user has access to the team
+        team = check_team_access(current_user, project.team_id, db)
+        
+        # Create new project with current user as creator and specified team
+        db_project = Project(
+            name=project.name,
+            description=project.description,
+            creator_id=current_user.id,
+            team_id=project.team_id
+        )
+        
+        # Save to database
+        db.add(db_project)
+        db.commit()
+        db.refresh(db_project)
+        
+        return db_project
+    except Exception as e:
+        db.rollback()
+        print(f"🚨 Error creating project: {str(e)}")
+        print(f"📍 Project data: {project}")
+        print(f"📍 Current user: {current_user.id}")
+        raise
 
 @router.put("/{project_id}", response_model=ProjectResponse)
 def update_project(
