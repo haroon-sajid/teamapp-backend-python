@@ -113,10 +113,11 @@ def get_current_admin_user(current_user: User = Depends(get_current_user)) -> Us
     if current_user.role != UserRole.ADMIN:
         raise_http_error(
             status.HTTP_403_FORBIDDEN,
-            "Permission denied",
-            "Not enough permissions. Admin role required."
+            "Access denied",
+            "You do not have permission to perform this action. Admin access is required."
         )
     return current_user
+
 
 
 # -------------------- AUTH ROUTES -------------------- #

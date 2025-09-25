@@ -37,6 +37,10 @@ app = FastAPI(
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """
+    Custom handler for FastAPI validation errors.
+    Returns clean, user-friendly error messages instead of 'Validation Error'.
+    """
     errors = []
     for error in exc.errors():
         field = error.get('loc', ['unknown'])[-1]
@@ -67,13 +71,15 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
                 "message": f"The field '{field}' has invalid input."
             })
 
-    # ✅ pick the first error message for "error"
-    first_message = errors[0]["message"] if errors else "Validation Error"
+    # Pick the first error message for the main message
+    first_message = errors[0]["message"] if errors else "Invalid input"
 
     return JSONResponse(
         status_code=422,
         content={
-            "error": first_message,  # 🔑 now UI will directly see the message
+            "success": False,
+            "error": "Validation Error",
+            "message": first_message,   # <── UI will always get one clean message
             "details": errors
         }
     )
@@ -127,7 +133,7 @@ if cors_origin_env:
     additional_origins = [origin.strip() for origin in cors_origin_env.split(',')]
     allowed_origins.extend(additional_origins)
 
-print(f"🔧 CORS Configuration - Allowed Origins: {allowed_origins}")
+print(f" CORS Configuration - Allowed Origins: {allowed_origins}")
 
 # Add CORS middleware with comprehensive configuration
 app.add_middleware(
@@ -223,7 +229,7 @@ async def startup_event():
         from migrate_database import migrate_database
         migrate_database()
     except Exception as e:
-        print(f"⚠️ Warning: Could not migrate database: {str(e)}")
+        print(f" Warning: Could not migrate database: {str(e)}")
         print("The application will continue, but there may be schema issues.")
     
     # Initialize default team and admin user
@@ -231,7 +237,7 @@ async def startup_event():
         from init_default_team import create_default_team_and_admin
         create_default_team_and_admin()
     except Exception as e:
-        print(f"⚠️ Warning: Could not initialize default data: {str(e)}")
+        print(f" Warning: Could not initialize default data: {str(e)}")
         print("The application will continue, but you may need to create teams manually.")
 
 @app.on_event("shutdown")
