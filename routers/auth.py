@@ -185,22 +185,22 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
     return db_user
 
 
-@router.post("/login", response_model=Token)
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    """Login with username or email and password."""
-    user = db.query(User).filter(
-        or_(User.email == form_data.username, User.username == form_data.username)
-    ).first()
+from schemas import UserLogin  # already imported in your file
+
+@router.post("/login-email", response_model=Token)
+def login_email(data: UserLogin, db: Session = Depends(get_db)):
+    """Login with email and password only."""
+    user = db.query(User).filter(User.email == data.email).first()
 
     if not user:
         raise_http_error(
             status.HTTP_401_UNAUTHORIZED,
             "User not found",
-            "No account found with this email or username.",
-            "username"
+            "No account found with this email.",
+            "email"
         )
 
-    if not verify_password(form_data.password, user.hashed_password):
+    if not verify_password(data.password, user.hashed_password):
         raise_http_error(
             status.HTTP_401_UNAUTHORIZED,
             "Incorrect password",
@@ -215,6 +215,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         "token_type": "bearer",
         "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60
     }
+
 
 # ---------------- Other login endpoints ---------------- #
 # (Same logic applies — all use raise_http_error now)
