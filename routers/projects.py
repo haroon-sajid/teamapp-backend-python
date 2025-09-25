@@ -102,11 +102,16 @@ def get_all_projects(
     # Enforce maximum limit for performance
     limit = min(limit, 100)
     
-    # Build base query with joins
-    query = db.query(Project).options(
-        joinedload(Project.creator),
-        joinedload(Project.team)
-    )
+    # Build base query with joins - make it more robust
+    try:
+        query = db.query(Project).options(
+            joinedload(Project.creator),
+            joinedload(Project.team)
+        )
+    except Exception as e:
+        print(f"🚨 Warning: Could not load relationships, using simple query: {str(e)}")
+        # Fallback to simple query without joins
+        query = db.query(Project)
     
     # Apply team-based access control
     if current_user.role == UserRole.ADMIN:
@@ -137,8 +142,17 @@ def get_all_projects(
         )
     
     # Apply pagination and execute query
-    projects = query.offset(skip).limit(limit).all()
-    return projects
+    try:
+        projects = query.offset(skip).limit(limit).all()
+        return projects
+    except Exception as e:
+        print(f"🚨 Error executing project query: {str(e)}")
+        import traceback
+        print(f"📍 Traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error retrieving projects"
+        )
 
 @router.get("/{project_id}", response_model=ProjectWithTasks)
 def get_project(
@@ -243,7 +257,12 @@ def create_project(
         print(f"🚨 Error creating project: {str(e)}")
         print(f"📍 Project data: {project}")
         print(f"📍 Current user: {current_user.id}")
-        raise
+        import traceback
+        print(f"📍 Traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error creating project"
+        )
 
 @router.put("/{project_id}", response_model=ProjectResponse)
 def update_project(

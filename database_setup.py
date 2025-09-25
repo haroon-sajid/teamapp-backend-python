@@ -18,59 +18,21 @@ def ensure_schema_is_current():
     print("Checking database schema...")
     
     try:
-        # For SQLite databases, we need to check if team_id column exists
-        if DATABASE_URL.startswith("sqlite"):
-            # Use raw SQLite connection to check schema
-            db_path = DATABASE_URL.replace("sqlite:///./", "")
+        # Use SQLAlchemy inspector to check schema
+        inspector = inspect(engine)
+        
+        # Check if projects table exists and has team_id column
+        if inspector.has_table('projects'):
+            columns = [col['name'] for col in inspector.get_columns('projects')]
             
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
-            
-            try:
-                # Check if projects table has team_id column
-                cursor.execute('PRAGMA table_info(projects)')
-                columns = [row[1] for row in cursor.fetchall()]
-                
-                if 'team_id' not in columns:
-                    print("❌ team_id column missing from projects table")
-                    print("🔧 Adding team_id column...")
-                    
-                    # Ensure teams table exists
-                    cursor.execute('''
-                        CREATE TABLE IF NOT EXISTS teams (
-                            id INTEGER PRIMARY KEY,
-                            name VARCHAR NOT NULL UNIQUE,
-                            description VARCHAR,
-                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                        )
-                    ''')
-                    
-                    # Create default team if no teams exist
-                    cursor.execute('SELECT COUNT(*) FROM teams')
-                    if cursor.fetchone()[0] == 0:
-                        cursor.execute(
-                            'INSERT INTO teams (name, description) VALUES (?, ?)',
-                            ('Default Team', 'Default team for existing projects')
-                        )
-                    
-                    # Get default team ID
-                    cursor.execute('SELECT id FROM teams LIMIT 1')
-                    default_team_id = cursor.fetchone()[0]
-                    
-                    # Add team_id column with default value
-                    cursor.execute(f'ALTER TABLE projects ADD COLUMN team_id INTEGER DEFAULT {default_team_id}')
-                    
-                    # Update existing projects
-                    cursor.execute('UPDATE projects SET team_id = ? WHERE team_id IS NULL', (default_team_id,))
-                    
-                    conn.commit()
-                    print("✅ Successfully added team_id column to projects table")
-                
-                else:
-                    print("✅ Database schema is up to date")
-                    
-            finally:
-                conn.close()
+            if 'team_id' not in columns:
+                print("❌ team_id column missing from projects table")
+                print("🔧 This requires manual database migration for production")
+                print("For now, creating tables with current schema...")
+            else:
+                print("✅ Database schema is up to date")
+        else:
+            print("📝 Projects table doesn't exist, will be created")
                 
     except Exception as e:
         print(f"⚠️  Warning: Could not verify database schema: {e}")

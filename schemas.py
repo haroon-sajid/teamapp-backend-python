@@ -266,8 +266,8 @@ class ProjectResponse(ProjectBase):
     team_id: int
     created_at: datetime
     updated_at: Optional[datetime] = None
-    creator: UserResponse  # Include creator details
-    team: 'TeamResponse'   # Include team details
+    creator: Optional[UserResponse] = None  # Include creator details (optional for robustness)
+    team: Optional['TeamResponse'] = None   # Include team details (optional for robustness)
     
     # Pydantic v2 configuration
     model_config = ConfigDict(from_attributes=True)

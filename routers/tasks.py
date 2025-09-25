@@ -212,7 +212,12 @@ def create_task(
         print(f"🚨 Error creating task: {str(e)}")
         print(f"📍 Task data: {task}")
         print(f"📍 Current user: {current_user.id}")
-        raise
+        import traceback
+        print(f"📍 Traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error creating task"
+        )
 
 @router.put("/{task_id}", response_model=TaskResponse)
 def update_task(

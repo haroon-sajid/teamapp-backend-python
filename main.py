@@ -81,10 +81,10 @@ async def general_exception_handler(request: Request, exc: Exception):
     import traceback
     
     # Log the full error for debugging
-    print(f"🚨 Unhandled Exception: {type(exc).__name__}: {str(exc)}")
-    print(f"📍 Request URL: {request.url}")
-    print(f"📍 Request Method: {request.method}")
-    print(f"📍 Traceback: {traceback.format_exc()}")
+    print(f" Unhandled Exception: {type(exc).__name__}: {str(exc)}")
+    print(f" Request URL: {request.url}")
+    print(f" Request Method: {request.method}")
+    print(f" Traceback: {traceback.format_exc()}")
     
     error_content = {
         "error": "Internal Server Error",
@@ -169,12 +169,48 @@ def root():
 def health_check():
     return {"status": "healthy", "service": "Kanban Board API"}
 
+@app.get("/debug/db")
+def debug_database():
+    """Debug endpoint to check database connectivity and basic queries."""
+    from database import SessionLocal
+    from models import User, Team, Project
+    
+    db = SessionLocal()
+    try:
+        # Test basic queries
+        user_count = db.query(User).count()
+        team_count = db.query(Team).count()
+        project_count = db.query(Project).count()
+        
+        return {
+            "status": "database_connected",
+            "user_count": user_count,
+            "team_count": team_count,
+            "project_count": project_count
+        }
+    except Exception as e:
+        return {
+            "status": "database_error",
+            "error": str(e),
+            "error_type": type(e).__name__
+        }
+    finally:
+        db.close()
+
 # ----------------------
 # Lifecycle Events
 # ----------------------
 @app.on_event("startup")
 async def startup_event():
     print("🚀 Kanban Board API is starting up...")
+    
+    # Run database migration first
+    try:
+        from migrate_database import migrate_database
+        migrate_database()
+    except Exception as e:
+        print(f"⚠️ Warning: Could not migrate database: {str(e)}")
+        print("The application will continue, but there may be schema issues.")
     
     # Initialize default team and admin user
     try:
