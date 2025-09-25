@@ -29,10 +29,11 @@ def create_admin_user():
         existing_admin = db.query(User).filter(User.email == "admin@teamapp.com").first()
         
         if existing_admin:
-            print("Admin user already exists!")
+            print("Admin user already exists.")
             print(f"Email: {existing_admin.email}")
             print(f"Username: {existing_admin.username}")
             print(f"Role: {existing_admin.role}")
+            print("No changes were made.")
             return
         
         # Hash the password
@@ -51,18 +52,18 @@ def create_admin_user():
         db.commit()
         db.refresh(admin_user)
         
-        print("✅ Admin user created successfully!")
+        print("Admin user created successfully.")
         print("=" * 40)
         print(f"Email: {admin_user.email}")
         print(f"Username: {admin_user.username}")
-        print(f"Password: admin123")
+        print(f"Temporary password: admin123 (please change this immediately)")
         print(f"Role: {admin_user.role}")
         print(f"ID: {admin_user.id}")
         print("=" * 40)
-        print("You can now login with these credentials and access Settings.")
+        print("You can now log in with these credentials and access Settings.")
         
     except Exception as e:
-        print(f"❌ Error creating admin user: {e}")
+        print(f"An error occurred while creating the admin user: {e}")
         db.rollback()
     finally:
         db.close()
@@ -89,7 +90,7 @@ def list_users():
             print("-" * 30)
             
     except Exception as e:
-        print(f"❌ Error listing users: {e}")
+        print(f"An error occurred while listing users: {e}")
     finally:
         db.close()
 
@@ -101,23 +102,23 @@ def promote_user_to_admin(email: str):
         user = db.query(User).filter(User.email == email).first()
         
         if not user:
-            print(f"❌ User with email '{email}' not found.")
+            print(f"User with email '{email}' was not found.")
             return
         
         if user.role == UserRole.ADMIN:
-            print(f"✅ User '{email}' is already an admin.")
+            print(f"User '{email}' is already an administrator.")
             return
         
         # Update role to admin
         user.role = UserRole.ADMIN
         db.commit()
         
-        print(f"✅ User '{email}' has been promoted to admin!")
+        print(f"User '{email}' has been promoted to administrator.")
         print(f"Username: {user.username}")
-        print(f"New Role: {user.role}")
+        print(f"New role: {user.role}")
         
     except Exception as e:
-        print(f"❌ Error promoting user: {e}")
+        print(f"An error occurred while promoting the user: {e}")
         db.rollback()
     finally:
         db.close()

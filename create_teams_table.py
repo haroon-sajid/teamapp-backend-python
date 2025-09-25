@@ -35,7 +35,7 @@ def create_teams_table():
         Team.__table__.create(bind=engine, checkfirst=True)
         TeamMember.__table__.create(bind=engine, checkfirst=True)
         
-        print("✅ Teams and TeamMembers tables created successfully!")
+        print(" Teams and TeamMembers tables created successfully!")
         print("\nTeams table structure:")
         print("- id: Primary key (Integer)")
         print("- name: Team name (String, unique)")
@@ -60,18 +60,18 @@ def create_teams_table():
             team_members_exists = team_members_result.fetchone() is not None
             
             if teams_exists and team_members_exists:
-                print("\n✅ Table verification successful - both teams and team_members tables exist in database")
+                print("\n Table verification successful - both teams and team_members tables exist in database")
             else:
                 if not teams_exists:
-                    print("\n❌ Table verification failed - teams table not found")
+                    print("\n Table verification failed - teams table not found")
                 if not team_members_exists:
-                    print("\n❌ Table verification failed - team_members table not found")
+                    print("\n Table verification failed - team_members table not found")
                 return False
         
         return True
         
     except Exception as e:
-        print(f"❌ Error creating teams table: {e}")
+        print(f" Error creating teams table: {e}")
         return False
 
 def main():
@@ -92,7 +92,7 @@ def main():
         print("   - DELETE /teams/{team_id}/members/{user_id} (admin only)")
         print("3. Manage team memberships with role-based permissions")
     else:
-        print("\n💥 Failed to create teams and team_members tables")
+        print("\n Failed to create teams and team_members tables")
         sys.exit(1)
 
 if __name__ == "__main__":

@@ -26,16 +26,16 @@ def ensure_schema_is_current():
             columns = [col['name'] for col in inspector.get_columns('projects')]
             
             if 'team_id' not in columns:
-                print("❌ team_id column missing from projects table")
-                print("🔧 This requires manual database migration for production")
+                print(" team_id column missing from projects table")
+                print(" This requires manual database migration for production")
                 print("For now, creating tables with current schema...")
             else:
-                print("✅ Database schema is up to date")
+                print(" Database schema is up to date")
         else:
-            print("📝 Projects table doesn't exist, will be created")
+            print(" Projects table doesn't exist, will be created")
                 
     except Exception as e:
-        print(f"⚠️  Warning: Could not verify database schema: {e}")
+        print(f"  Warning: Could not verify database schema: {e}")
         print("This might be okay if using PostgreSQL or if this is a fresh installation")
 
 def create_tables():
@@ -47,7 +47,7 @@ def create_tables():
     
     # Then create/update all tables
     Base.metadata.create_all(bind=engine)
-    print("✅ Database tables created/updated")
+    print(" Database tables created/updated")
 
 if __name__ == "__main__":
     create_tables()

@@ -55,7 +55,7 @@ def check_team_access(user: User, team_id: int, db: Session) -> Team:
     if not team_member:
         # Log permission failure with helpful context (kept lightweight for production)
         try:
-            print(f"🚫 Permission denied: user_id={user.id} team_id={team_id} team_name={team.name}")
+            print(f" Permission denied: user_id={user.id} team_id={team_id} team_name={team.name}")
         except Exception:
             pass
         raise HTTPException(
