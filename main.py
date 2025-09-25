@@ -50,7 +50,10 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
                 errors.append({"field": "email", "message": "The email you entered is not valid."})
 
         elif field == 'username':
-            errors.append({"field": "username", "message": "Usernames should only include letters, numbers, or underscores."})
+            errors.append({
+                "field": "username",
+                "message": "Usernames should only include letters, numbers, or underscores."
+            })
 
         elif field == 'password':
             errors.append({
@@ -59,15 +62,19 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             })
 
         else:
-            errors.append({"field": str(field), "message": f"The field '{field}' has invalid input."})
+            errors.append({
+                "field": str(field),
+                "message": f"The field '{field}' has invalid input."
+            })
 
     return JSONResponse(
         status_code=422,
         content={
-            "error": "Validation Error",
-            "details": message
+            "error": "Validation Error",   # generic error type
+            "details": errors               # ✅ send back the full list of errors
         }
     )
+
 
 
 @app.exception_handler(HTTPException)
