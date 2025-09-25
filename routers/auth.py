@@ -12,6 +12,7 @@ from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 import os
+import re
 
 from database import get_db
 from models import User, UserRole, Team, TeamMember, TeamMemberRole
@@ -156,19 +157,10 @@ def get_current_admin_user(current_user: User = Depends(get_current_user)) -> Us
 @router.post("/signup", response_model=UserResponse)
 def signup(user: UserCreate, db: Session = Depends(get_db)):
     """
-    Create a new user account.
-    
-    Args:
-        user: User creation data (email, username, password, role)
-        db: Database session
-    
-    Returns:
-        Created user information (without password)
-    
-    Raises:
-        HTTPException: If email or username already exists
+    Create a new user account with validation for email, username, and password.
     """
-    # Check if user with this email already exists
+
+    # ✅ Email already exists
     db_user = db.query(User).filter(User.email == user.email).first()
     if db_user:
         raise HTTPException(
@@ -179,8 +171,8 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
                 "field": "email"
             }
         )
-    
-    # Check if user with this username already exists
+
+    # ✅ Username already exists
     db_user = db.query(User).filter(User.username == user.username).first()
     if db_user:
         raise HTTPException(
@@ -191,23 +183,42 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
                 "field": "username"
             }
         )
-    
-    # Create new user with hashed password
-    hashed_password = get_password_hash(user.password)
+
+    # ❌ Password validation
+    password = user.password
+    if len(password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error": "Weak password",
+                "message": "Password must be at least 8 characters long.",
+                "field": "password"
+            }
+        )
+
+    if not re.search(r"[A-Za-z]", password) or not re.search(r"\d", password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error": "Weak password",
+                "message": "Password must include both letters and numbers.",
+                "field": "password"
+            }
+        )
+
+    # ✅ Hash and create user
+    hashed_password = get_password_hash(password)
     db_user = User(
         email=user.email,
         username=user.username,
         hashed_password=hashed_password,
         role=user.role or UserRole.MEMBER
     )
-    
-    # Save to database
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
 
-    # Ensure the new user has at least one team they belong to.
-    # Create a personal team for the user if none exists yet.
+    # ✅ Ensure user has a personal team
     try:
         existing_membership = db.query(TeamMember).filter(TeamMember.user_id == db_user.id).first()
         if not existing_membership:
@@ -221,10 +232,10 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
             db.add(membership)
             db.commit()
     except Exception:
-        # Don't block signup on team creation; this will be handled later if needed
-        db.rollback()
+        db.rollback()  # Don’t block signup if team creation fails
 
     return db_user
+
 
 @router.post("/login", response_model=Token)
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
