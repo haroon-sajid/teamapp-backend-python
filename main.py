@@ -39,13 +39,22 @@ app = FastAPI(
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     errors = []
-    for error in exc.errors():
-        field = error.get('loc', ['unknown'])[-1]
-        msg = error.get('msg', 'Invalid input')   # ✅ use pydantic’s own message
+    for err in exc.errors():
+        field = err.get("loc")[-1] if err.get("loc") else "unknown"
+        error_type = err.get("type", "")
+        message = err.get("msg", "Invalid input")
 
-        errors.append({"field": str(field), "message": msg})
+        # Customize common field messages
+        if field == "email" and error_type == "value_error.email":
+            message = "Please enter a valid email address."
+        elif field == "password":
+            message = "Password must include at least 8 characters with letters and numbers."
+        elif field == "username":
+            message = "Usernames should only include letters, numbers, or underscores."
 
-    first_message = errors[0]["message"] if errors else "Invalid input"
+        errors.append({"field": str(field), "message": message})
+
+    first_message = errors[0]["message"] if errors else "Validation Error"
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={

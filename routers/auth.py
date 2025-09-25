@@ -217,6 +217,40 @@ def login_email(data: UserLogin, db: Session = Depends(get_db)):
     }
 
 
+# Standard OAuth2 login using form data (username or email in username field)
+@router.post("/login", response_model=Token)
+def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(
+        or_(User.email == form_data.username, User.username == form_data.username)
+    ).first()
+
+    if not user:
+        raise_http_error(
+            status.HTTP_401_UNAUTHORIZED,
+            "User not found",
+            "No account found with this email or username.",
+            "username"
+        )
+
+    if not verify_password(form_data.password, user.hashed_password):
+        raise_http_error(
+            status.HTTP_401_UNAUTHORIZED,
+            "Incorrect password",
+            "The password you entered is incorrect.",
+            "password"
+        )
+
+    token_data = {"user_id": user.id, "email": user.email, "role": user.role.value}
+    return {
+        "access_token": create_access_token(token_data),
+        "refresh_token": create_refresh_token(token_data),
+        "token_type": "bearer",
+        "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    }
+
 # ---------------- Other login endpoints ---------------- #
 # (Same logic applies — all use raise_http_error now)
 # -------------------------------------------------------
