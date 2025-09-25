@@ -81,30 +81,28 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 from fastapi.middleware.cors import CORSMiddleware
 import os
 
-# Parse CORS origins from environment variable
-cors_origin_env = os.getenv("CORS_ORIGIN")
+# Define allowed origins for CORS
+allowed_origins = [
+    "https://teamapp-frontend-react.vercel.app",  # Production Vercel frontend
+    "http://localhost:3000",                      # Local development
+    "http://127.0.0.1:3000",                     # Local development alternative
+]
 
+# Add any additional origins from environment variable
+cors_origin_env = os.getenv("CORS_ORIGIN")
 if cors_origin_env:
-    # Split multiple origins by comma and strip spaces
-    allowed_origins = [origin.strip() for origin in cors_origin_env.split(',')]
-    allow_credentials = True
-else:
-    # Fallback for local development only
-    allowed_origins = [
-        "http://localhost:3000",
-        "http://127.0.0.1:3000"
-    ]
-    allow_credentials = True
-    
+    additional_origins = [origin.strip() for origin in cors_origin_env.split(',')]
+    allowed_origins.extend(additional_origins)
+
+print(f" CORS Configuration - Allowed Origins: {allowed_origins}")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://teamapp-frontend-react.vercel.app",  # your Vercel frontend
-    ],
+    allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 
