@@ -202,7 +202,7 @@ def debug_database():
 # ----------------------
 @app.on_event("startup")
 async def startup_event():
-    print("🚀 Kanban Board API is starting up...")
+    print(" Kanban Board API is starting up...")
     
     # Run database migration first
     try:

@@ -53,6 +53,11 @@ def check_team_access(user: User, team_id: int, db: Session) -> Team:
     ).first()
     
     if not team_member:
+        # Log permission failure with helpful context (kept lightweight for production)
+        try:
+            print(f"🚫 Permission denied: user_id={user.id} team_id={team_id} team_name={team.name}")
+        except Exception:
+            pass
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={
@@ -211,7 +216,7 @@ def get_project(
     
     return project
 
-@router.post("/", response_model=ProjectResponse)
+@router.post("/", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
 def create_project(
     project: ProjectCreate,
     current_user: User = Depends(get_current_user),
@@ -252,6 +257,10 @@ def create_project(
         db.refresh(db_project)
         
         return db_project
+    except HTTPException:
+        # Allow HTTP errors (e.g., 403/404) to propagate as-is
+        db.rollback()
+        raise
     except Exception as e:
         db.rollback()
         print(f"🚨 Error creating project: {str(e)}")

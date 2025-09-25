@@ -182,6 +182,23 @@ def create_task(
                 detail="Project not found"
             )
         
+        # Ensure the user can access the project's team (403 if not)
+        if current_user.role != UserRole.ADMIN:
+            team_member = db.query(TeamMember).filter(
+                TeamMember.team_id == project.team_id,
+                TeamMember.user_id == current_user.id
+            ).first()
+            if not team_member:
+                # Log minimal helpful context
+                try:
+                    print(f"🚫 Task create denied: user_id={current_user.id} project_id={task.project_id} team_id={project.team_id}")
+                except Exception:
+                    pass
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Not authorized to create tasks for this project"
+                )
+        
         # Check assignment permissions
         if task.assignee_id is not None:
             # Verify the assignee exists
@@ -207,13 +224,16 @@ def create_task(
         db.refresh(db_task)
         
         return db_task
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
         db.rollback()
-        print(f"🚨 Error creating task: {str(e)}")
-        print(f"📍 Task data: {task}")
-        print(f"📍 Current user: {current_user.id}")
+        print(f" Error creating task: {str(e)}")
+        print(f" Task data: {task}")
+        print(f" Current user: {current_user.id}")
         import traceback
-        print(f"📍 Traceback: {traceback.format_exc()}")
+        print(f" Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error creating task"

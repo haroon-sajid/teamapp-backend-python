@@ -14,7 +14,7 @@ from passlib.context import CryptContext
 import os
 
 from database import get_db
-from models import User, UserRole
+from models import User, UserRole, Team, TeamMember, TeamMemberRole
 from schemas import (
     UserCreate, UserResponse, Token, TokenData, UserLogin, UserLoginFlexible,
     PasswordChange, MessageResponse,
@@ -205,7 +205,25 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
-    
+
+    # Ensure the new user has at least one team they belong to.
+    # Create a personal team for the user if none exists yet.
+    try:
+        existing_membership = db.query(TeamMember).filter(TeamMember.user_id == db_user.id).first()
+        if not existing_membership:
+            team_name = f"{db_user.username}'s Team"
+            personal_team = Team(name=team_name, description=f"Personal team for {db_user.username}")
+            db.add(personal_team)
+            db.commit()
+            db.refresh(personal_team)
+
+            membership = TeamMember(team_id=personal_team.id, user_id=db_user.id, role=TeamMemberRole.MEMBER)
+            db.add(membership)
+            db.commit()
+    except Exception:
+        # Don't block signup on team creation; this will be handled later if needed
+        db.rollback()
+
     return db_user
 
 @router.post("/login", response_model=Token)
