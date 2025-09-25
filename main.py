@@ -67,11 +67,14 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
                 "message": f"The field '{field}' has invalid input."
             })
 
+    # ✅ pick the first error message for "error"
+    first_message = errors[0]["message"] if errors else "Validation Error"
+
     return JSONResponse(
         status_code=422,
         content={
-            "error": "Validation Error",   # generic error type
-            "details": errors               # ✅ send back the full list of errors
+            "error": first_message,  # 🔑 now UI will directly see the message
+            "details": errors
         }
     )
 
