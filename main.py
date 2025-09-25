@@ -95,15 +95,18 @@ else:
         "http://127.0.0.1:3000"
     ]
     allow_credentials = True
+    
 
-# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,  # Must not be ["*"] if allow_credentials=True
-    allow_credentials=allow_credentials,
+    allow_origins=[
+        "https://teamapp-frontend-react.vercel.app",  # your Vercel frontend
+    ],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # ----------------------
 # Routers
