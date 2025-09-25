@@ -33,9 +33,9 @@ def create_default_team_and_admin():
             db.add(admin_user)
             db.commit()
             db.refresh(admin_user)
-            print(f"✅ Admin user created with ID: {admin_user.id}")
+            print(f" Admin user created with ID: {admin_user.id}")
         else:
-            print(f"✅ Admin user already exists with ID: {admin_user.id}")
+            print(f" Admin user already exists with ID: {admin_user.id}")
         
         # Check if default team exists
         default_team = db.query(Team).filter(Team.name == "Default Team").first()
@@ -49,9 +49,9 @@ def create_default_team_and_admin():
             db.add(default_team)
             db.commit()
             db.refresh(default_team)
-            print(f"✅ Default team created with ID: {default_team.id}")
+            print(f" Default team created with ID: {default_team.id}")
         else:
-            print(f"✅ Default team already exists with ID: {default_team.id}")
+            print(f" Default team already exists with ID: {default_team.id}")
         
         # Check if admin is a member of the default team
         team_membership = db.query(TeamMember).filter(
@@ -68,22 +68,22 @@ def create_default_team_and_admin():
             )
             db.add(team_membership)
             db.commit()
-            print("✅ Admin added to default team")
+            print(" Admin added to default team")
         else:
-            print("✅ Admin is already a member of the default team")
+            print(" Admin is already a member of the default team")
         
-        print("\n🎉 Database initialization completed successfully!")
-        print(f"📧 Admin email: admin@teamapp.com")
-        print(f"🔑 Admin password: admin123")
-        print(f"👥 Default team: {default_team.name} (ID: {default_team.id})")
+        print("\n Database initialization completed successfully!")
+        print(f" Admin email: admin@teamapp.com")
+        print(f" Admin password: admin123")
+        print(f" Default team: {default_team.name} (ID: {default_team.id})")
         
     except Exception as e:
-        print(f"❌ Error during initialization: {str(e)}")
+        print(f" Error during initialization: {str(e)}")
         db.rollback()
         raise
     finally:
         db.close()
 
 if __name__ == "__main__":
-    print("🚀 Initializing database with default team and admin user...")
+    print(" Initializing database with default team and admin user...")
     create_default_team_and_admin()

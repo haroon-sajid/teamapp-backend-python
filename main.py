@@ -34,6 +34,7 @@ app = FastAPI(
 # ----------------------
 # Custom Exception Handlers
 # ----------------------
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     errors = []
@@ -46,16 +47,19 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             if error_type == 'value_error.email':
                 errors.append({"field": "email", "message": "Please enter a valid email address."})
             else:
-                errors.append({"field": "email", "message": "Invalid email format."})
+                errors.append({"field": "email", "message": "The email you entered is not valid."})
 
         elif field == 'username':
-            errors.append({"field": "username", "message": "Invalid username format."})
+            errors.append({"field": "username", "message": "Usernames should only include letters, numbers, or underscores."})
 
         elif field == 'password':
-            errors.append({"field": "password", "message": "Password must meet complexity requirements."})
+            errors.append({
+                "field": "password",
+                "message": "Password must include at least 8 characters, with both letters and numbers."
+            })
 
         else:
-            errors.append({"field": str(field), "message": "Invalid input."})
+            errors.append({"field": str(field), "message": f"The field '{field}' has invalid input."})
 
     return JSONResponse(
         status_code=422,
@@ -65,34 +69,34 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         }
     )
 
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     error_content = {
         "error": "Request Error",
-        "message": str(exc.detail),
+        "message": str(exc.detail) if exc.detail else "Something went wrong with your request.",
         "success": False,
         "status_code": exc.status_code
     }
     return JSONResponse(status_code=exc.status_code, content=error_content)
 
+
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
-    """Global exception handler for unhandled errors"""
     import traceback
-    
-    # Log the full error for debugging
-    print(f" Unhandled Exception: {type(exc).__name__}: {str(exc)}")
-    print(f" Request URL: {request.url}")
-    print(f" Request Method: {request.method}")
-    print(f" Traceback: {traceback.format_exc()}")
-    
+    print(f"Unhandled Exception: {type(exc).__name__}: {str(exc)}")
+    print(f"Request URL: {request.url}")
+    print(f"Request Method: {request.method}")
+    print(f"Traceback: {traceback.format_exc()}")
+
     error_content = {
         "error": "Internal Server Error",
-        "message": "An unexpected error occurred. Please try again later.",
+        "message": "Oops! Something went wrong on our end. Please try again later.",
         "success": False,
         "status_code": 500
     }
     return JSONResponse(status_code=500, content=error_content)
+
 
 # ----------------------
 # CORS CONFIGURATION
