@@ -2,9 +2,10 @@
 Main FastAPI application entry point.
 This file sets up the FastAPI app and includes all routers.
 """
+# change this line:
 
 import os
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -37,81 +38,95 @@ app = FastAPI(
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    """
-    Custom handler for FastAPI validation errors.
-    Returns clean, user-friendly error messages instead of 'Validation Error'.
-    """
-    errors = []
-    for error in exc.errors():
-        field = error.get('loc', ['unknown'])[-1]
-        error_type = error.get('type', '')
-        error_msg = error.get('msg', '')
+	"""
+	Return a consistent, structured JSON response for validation errors so the UI
+	receives a parsed object (not a stringified dict).
+	"""
+	errors = []
+	for error in exc.errors():
+		field = error.get('loc', ['unknown'])[-1]
+		error_type = error.get('type', '')
+		# Map common validation issues to friendly messages
+		if field == 'email':
+			if error_type == 'value_error.email':
+				msg = "Please enter a valid email address."
+			else:
+				msg = "The email you entered is not valid."
+		elif field == 'username':
+			msg = "Usernames should only include letters, numbers, or underscores."
+		elif field == 'password':
+			msg = "Password must include at least 8 characters, with both letters and numbers."
+		else:
+			msg = f"The field '{field}' has invalid input."
 
-        if field == 'email':
-            if error_type == 'value_error.email':
-                errors.append({"field": "email", "message": "Please enter a valid email address."})
-            else:
-                errors.append({"field": "email", "message": "The email you entered is not valid."})
+		errors.append({"field": str(field), "message": msg})
 
-        elif field == 'username':
-            errors.append({
-                "field": "username",
-                "message": "Usernames should only include letters, numbers, or underscores."
-            })
-
-        elif field == 'password':
-            errors.append({
-                "field": "password",
-                "message": "Password must include at least 8 characters, with both letters and numbers."
-            })
-
-        else:
-            errors.append({
-                "field": str(field),
-                "message": f"The field '{field}' has invalid input."
-            })
-
-    # Pick the first error message for the main message
-    first_message = errors[0]["message"] if errors else "Invalid input"
-
-    return JSONResponse(
-        status_code=422,
-        content={
-            "success": False,
-            "error": "Validation Error",
-            "message": first_message,   # <── UI will always get one clean message
-            "details": errors
-        }
-    )
+	first_message = errors[0]["message"] if errors else "Invalid input"
+	return JSONResponse(
+		status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+		content={
+			"success": False,
+			"error": "Validation Error",
+			"message": first_message,
+			"details": errors,
+			"status_code": status.HTTP_422_UNPROCESSABLE_ENTITY
+		}
+	)
 
 
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
-    error_content = {
-        "error": "Request Error",
-        "message": str(exc.detail) if exc.detail else "Something went wrong with your request.",
-        "success": False,
-        "status_code": exc.status_code
-    }
-    return JSONResponse(status_code=exc.status_code, content=error_content)
+	"""
+	If exc.detail is already a dict (our pattern from raise_http_error), return it
+	directly so the client receives proper JSON. Otherwise fall back to a generic structure.
+	"""
+	detail = exc.detail
+
+	# If the raised HTTPException already carries a structured dict, use it directly.
+	if isinstance(detail, dict):
+		# Copy to avoid mutation
+		response = detail.copy()
+		# Ensure consistent base fields
+		response.setdefault("success", False)
+		response.setdefault("status_code", exc.status_code)
+		# If 'message' missing but 'error' present, promote error -> message
+		if "message" not in response and "error" in response:
+			response["message"] = response.get("error")
+		return JSONResponse(status_code=exc.status_code, content=response)
+
+	# Otherwise, return a normalized fallback JSON
+	return JSONResponse(
+		status_code=exc.status_code,
+		content={
+			"success": False,
+			"error": "Request Error",
+			"message": str(detail) if detail else "Something went wrong with your request.",
+			"status_code": exc.status_code
+		}
+	)
 
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
-    import traceback
-    print(f"Unhandled Exception: {type(exc).__name__}: {str(exc)}")
-    print(f"Request URL: {request.url}")
-    print(f"Request Method: {request.method}")
-    print(f"Traceback: {traceback.format_exc()}")
+	"""
+	Final fallback: log full traceback and return a consistent JSON error.
+	"""
+	import traceback
+	print(f"Unhandled Exception: {type(exc).__name__}: {str(exc)}")
+	print(f"Request URL: {request.url}")
+	print(f"Request Method: {request.method}")
+	print(f"Traceback: {traceback.format_exc()}")
 
-    error_content = {
-        "error": "Internal Server Error",
-        "message": "Oops! Something went wrong on our end. Please try again later.",
-        "success": False,
-        "status_code": 500
-    }
-    return JSONResponse(status_code=500, content=error_content)
+	return JSONResponse(
+		status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+		content={
+			"success": False,
+			"error": "Internal Server Error",
+			"message": "Oops! Something went wrong on our end. Please try again later.",
+			"status_code": status.HTTP_500_INTERNAL_SERVER_ERROR
+		}
+	)
 
 
 # ----------------------
