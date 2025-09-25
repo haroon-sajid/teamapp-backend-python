@@ -278,7 +278,7 @@ def update_task(
 @router.patch("/{task_id}/status", response_model=TaskResponse)
 def update_task_status(
     task_id: int,
-    status: TaskStatus,
+    task_update: TaskUpdate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -304,7 +304,14 @@ def update_task_status(
             detail="You can only update status of tasks assigned to you"
         )
 
-    task.status = status
+    # Validate presence of status in request body
+    if task_update.status is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Field 'status' is required"
+        )
+
+    task.status = task_update.status
     db.commit()
     db.refresh(task)
     return task
