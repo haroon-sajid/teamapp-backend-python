@@ -107,7 +107,7 @@ class UserLogin(BaseModel):
     """Schema for user login"""
     email: str = Field(
         ..., 
-        min_length=5, 
+        min_length=1, 
         max_length=255, 
         description="Your email address",
         examples=["user@example.com", "john.doe@gmail.com"]
@@ -123,13 +123,13 @@ class UserLogin(BaseModel):
     @classmethod
     def validate_email(cls, value: str) -> str:
         """Validate email format using regex pattern"""
-        if not value:
+        if not value or not value.strip():
             raise ValueError('Email is required')
         
         # Comprehensive email regex pattern
         email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
         
-        if not re.match(email_pattern, value):
+        if not re.match(email_pattern, value.strip()):
             raise ValueError('Invalid email format. Please provide a valid email address.')
         
         return value.lower().strip()

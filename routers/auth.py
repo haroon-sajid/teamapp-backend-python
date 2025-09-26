@@ -188,69 +188,59 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
 from schemas import UserLogin  # already imported in your file
 
 @router.post("/login-email", response_model=Token)
-async def login_email(request: Request, db: Session = Depends(get_db)):
-    """Login with email and password.
-
-    Accepts both JSON (application/json) and form (application/x-www-form-urlencoded or multipart/form-data).
-    Returns unified error messages and avoids leaking which field was wrong.
-    """
-    # Parse request body as JSON first; if that fails, fall back to form
-    email = None
-    password = None
-
-    try:
-        body = await request.json()
-        if isinstance(body, dict):
-            email = body.get("email")
-            password = body.get("password")
-    except Exception:
-        # Not JSON; try form
-        try:
-            form = await request.form()
-            email = form.get("email")
-            password = form.get("password")
-        except Exception:
-            pass
-
-    # Basic presence validation with consistent 422
-    if not email:
-        raise_http_error(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
-            "Validation Error",
-            "Email is required.",
-            "email",
-        )
-    if not isinstance(email, str):
-        raise_http_error(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
-            "Validation Error",
-            "Email must be a string.",
-            "email",
-        )
-    if not password:
-        raise_http_error(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
-            "Validation Error",
-            "Password is required.",
-            "password",
-        )
-    if not isinstance(password, str):
-        raise_http_error(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
-            "Validation Error",
-            "Password must be a string.",
-            "password",
-        )
-
-    # Authenticate
-    user = db.query(User).filter(User.email == email.lower()).first()
-    if not user or not verify_password(password, user.hashed_password):
+def login_email(data: UserLogin, db: Session = Depends(get_db)):
+    """Login with email and password using proper Pydantic validation."""
+    
+    # Authenticate user
+    user = db.query(User).filter(User.email == data.email.lower()).first()
+    
+    if not user or not verify_password(data.password, user.hashed_password):
         raise_http_error(
             status.HTTP_401_UNAUTHORIZED,
-            "Authentication Failed",
+            "Authentication Error",
             "Invalid email or password.",
         )
 
+    # Create tokens
+    token_data = {"user_id": user.id, "email": user.email, "role": user.role.value}
+    return {
+        "access_token": create_access_token(token_data),
+        "refresh_token": create_refresh_token(token_data),
+        "token_type": "bearer",
+        "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    }
+
+
+@router.post("/debug-login")
+def debug_login(data: UserLogin):
+    """Debug endpoint to test if data is being received properly."""
+    return {
+        "success": True,
+        "message": "Data received successfully",
+        "received_email": data.email,
+        "received_password_length": len(data.password),
+        "email_type": type(data.email).__name__,
+        "password_type": type(data.password).__name__
+    }
+
+
+@router.post("/login", response_model=Token)
+def login_form(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    """Alternative login endpoint that accepts form data (OAuth2 compatible)."""
+    
+    # Authenticate user - form_data.username can be email or username
+    user = db.query(User).filter(
+        or_(User.email == form_data.username.lower(), User.username == form_data.username)
+    ).first()
+    
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise_http_error(
+            status.HTTP_401_UNAUTHORIZED,
+            "Authentication Error", 
+            "Invalid email or password.",
+        )
+
+    # Create tokens
     token_data = {"user_id": user.id, "email": user.email, "role": user.role.value}
     return {
         "access_token": create_access_token(token_data),
