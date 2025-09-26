@@ -189,11 +189,16 @@ from schemas import UserLogin  # already imported in your file
 
 @router.post("/login-email", response_model=Token)
 def login_email(data: UserLogin, db: Session = Depends(get_db)):
-    """Login with email and password using proper Pydantic validation."""
-    
-    # Authenticate user
-    user = db.query(User).filter(User.email == data.email.lower()).first()
-    
+    """Login with email or username and password using proper Pydantic validation."""
+
+    identifier = data.email_or_username.strip()
+    identifier_lower = identifier.lower()
+
+    # Authenticate by email OR username
+    user = db.query(User).filter(
+        or_(User.email == identifier_lower, User.username == identifier)
+    ).first()
+
     if not user or not verify_password(data.password, user.hashed_password):
         raise_http_error(
             status.HTTP_401_UNAUTHORIZED,
@@ -217,9 +222,9 @@ def debug_login(data: UserLogin):
     return {
         "success": True,
         "message": "Data received successfully",
-        "received_email": data.email,
+        "received_identifier": data.email_or_username,
         "received_password_length": len(data.password),
-        "email_type": type(data.email).__name__,
+        "identifier_type": type(data.email_or_username).__name__,
         "password_type": type(data.password).__name__
     }
 

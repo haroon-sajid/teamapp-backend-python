@@ -104,19 +104,18 @@ class UserCreate(UserBase):
         return value
 
 class UserLogin(BaseModel):
-    """Schema for user login."""
-    # Accept multiple possible front-end keys via aliases for production compatibility
-    email: str = Field(
-        ..., 
-        min_length=1, 
-        max_length=255, 
-        description="Your email address",
-        examples=["user@example.com", "john.doe@gmail.com"],
-        alias="emailOrUsername"
+    """Schema for user login accepting email or username via camelCase alias."""
+    # Use snake_case internally; accept frontend camelCase key
+    email_or_username: str = Field(
+        ...,
+        alias="emailOrUsername",
+        min_length=1,
+        max_length=255,
+        description="Email or username"
     )
     password: str = Field(
-        ..., 
-        min_length=1, 
+        ...,
+        min_length=1,
         description="Your password",
         examples=["mypassword123", "securepass456"]
     )
@@ -124,20 +123,22 @@ class UserLogin(BaseModel):
     # Allow population by field name or alias (emailOrUsername)
     model_config = ConfigDict(populate_by_name=True)
 
-    @field_validator('email')
+    @field_validator('email_or_username')
     @classmethod
-    def validate_email(cls, value: str) -> str:
-        """Validate email format using regex pattern"""
+    def validate_email_or_username(cls, value: str) -> str:
         if not value or not value.strip():
-            raise ValueError('Email is required')
-        
-        # Comprehensive email regex pattern
-        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-        
-        if not re.match(email_pattern, value.strip()):
-            raise ValueError('Invalid email format. Please provide a valid email address.')
-        
-        return value.lower().strip()
+            raise ValueError('Email or username is required')
+        value = value.strip()
+        # If looks like email, basic sanity; otherwise allow username pattern
+        if '@' in value:
+            email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+            if not re.match(email_pattern, value):
+                raise ValueError('Invalid email format. Please provide a valid email address.')
+            return value.lower()
+        # username pattern
+        if not re.match(r'^[a-zA-Z0-9_-]+$', value):
+            raise ValueError('Username can only contain letters, numbers, underscores, and hyphens')
+        return value
 
 class UserLoginFlexible(BaseModel):
     """Schema for flexible user login (accepts email or username)"""
