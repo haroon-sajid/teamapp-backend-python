@@ -38,56 +38,86 @@ app = FastAPI(
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    errors = []
+    """
+    Produce clean, user-friendly validation messages.
+    Examples:
+    - missing field -> "Email is required."
+    - type error -> "Password must be a string."
+    - other -> Pydantic's message, capitalized and punctuated.
+    """
+    formatted_errors = []
+
     for error in exc.errors():
-        field = error.get('loc', ['unknown'])[-1]
-        msg = error.get('msg', 'Invalid input')
+        loc = error.get("loc", [])
+        field = str(loc[-1]) if loc else "field"
+        msg = error.get("msg", "Invalid input")
+        error_type = error.get("type", "")
 
-        errors.append({"field": str(field), "message": msg})
+        # Friendly mappings
+        if msg == "Field required":
+            friendly = f"{field.capitalize()} is required."
+        elif error_type.startswith("type_error"):
+            # Extract expected type if present: e.g., type_error.str
+            expected = error_type.split(".")[-1]
+            # Map some common names
+            type_map = {
+                "str": "a string",
+                "int": "an integer",
+                "float": "a number",
+                "bool": "a boolean",
+                "list": "an array",
+                "dict": "an object",
+            }
+            human = type_map.get(expected, f"type '{expected}'")
+            friendly = f"{field.capitalize()} must be {human}."
+        else:
+            # Ensure first letter capital and end with period
+            friendly = msg[0].upper() + msg[1:]
+            if not friendly.endswith("."):
+                friendly += "."
 
-    first_message = errors[0]["message"] if errors else "Invalid input"
+        formatted_errors.append({"field": field, "message": friendly})
+
+    top_message = formatted_errors[0]["message"] if formatted_errors else "Validation failed."
+
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={
             "success": False,
             "error": "Validation Error",
-            "message": first_message,
-            "details": errors,
-            "status_code": status.HTTP_422_UNPROCESSABLE_ENTITY
-        }
+            "message": top_message,
+            "status_code": status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "details": formatted_errors,
+        },
     )
 
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
-	"""
-	If exc.detail is already a dict (our pattern from raise_http_error), return it
-	directly so the client receives proper JSON. Otherwise fall back to a generic structure.
-	"""
-	detail = exc.detail
+    """Return normalized HTTP error JSON consistently."""
+    detail = exc.detail
 
-	# If the raised HTTPException already carries a structured dict, use it directly.
-	if isinstance(detail, dict):
-		# Copy to avoid mutation
-		response = detail.copy()
-		# Ensure consistent base fields
-		response.setdefault("success", False)
-		response.setdefault("status_code", exc.status_code)
-		# If 'message' missing but 'error' present, promote error -> message
-		if "message" not in response and "error" in response:
-			response["message"] = response.get("error")
-		return JSONResponse(status_code=exc.status_code, content=response)
+    if isinstance(detail, dict):
+        response = {
+            "success": False,
+            "error": detail.get("error") or "Request Error",
+            "message": detail.get("message") or detail.get("error") or "An error occurred.",
+            "status_code": exc.status_code,
+        }
+        # Include field only if present
+        if "field" in detail and detail["field"] is not None:
+            response["field"] = detail["field"]
+        return JSONResponse(status_code=exc.status_code, content=response)
 
-	# Otherwise, return a normalized fallback JSON
-	return JSONResponse(
-		status_code=exc.status_code,
-		content={
-			"success": False,
-			"error": "Request Error",
-			"message": str(detail) if detail else "Something went wrong with your request.",
-			"status_code": exc.status_code
-		}
-	)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "success": False,
+            "error": "Request Error",
+            "message": str(detail) if detail else "Something went wrong with your request.",
+            "status_code": exc.status_code,
+        },
+    )
 
 
 @app.exception_handler(Exception)

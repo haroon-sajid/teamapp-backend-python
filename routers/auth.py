@@ -3,7 +3,7 @@ Authentication router handling user signup and login.
 Uses JWT tokens for authentication.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
@@ -188,24 +188,67 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
 from schemas import UserLogin  # already imported in your file
 
 @router.post("/login-email", response_model=Token)
-def login_email(data: UserLogin, db: Session = Depends(get_db)):
-    """Login with email and password only."""
-    user = db.query(User).filter(User.email == data.email).first()
+async def login_email(request: Request, db: Session = Depends(get_db)):
+    """Login with email and password.
 
-    if not user:
+    Accepts both JSON (application/json) and form (application/x-www-form-urlencoded or multipart/form-data).
+    Returns unified error messages and avoids leaking which field was wrong.
+    """
+    # Parse request body as JSON first; if that fails, fall back to form
+    email = None
+    password = None
+
+    try:
+        body = await request.json()
+        if isinstance(body, dict):
+            email = body.get("email")
+            password = body.get("password")
+    except Exception:
+        # Not JSON; try form
+        try:
+            form = await request.form()
+            email = form.get("email")
+            password = form.get("password")
+        except Exception:
+            pass
+
+    # Basic presence validation with consistent 422
+    if not email:
         raise_http_error(
-            status.HTTP_401_UNAUTHORIZED,
-            "User not found",
-            "No account found with this email.",
-            "email"
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "Validation Error",
+            "Email is required.",
+            "email",
+        )
+    if not isinstance(email, str):
+        raise_http_error(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "Validation Error",
+            "Email must be a string.",
+            "email",
+        )
+    if not password:
+        raise_http_error(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "Validation Error",
+            "Password is required.",
+            "password",
+        )
+    if not isinstance(password, str):
+        raise_http_error(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "Validation Error",
+            "Password must be a string.",
+            "password",
         )
 
-    if not verify_password(data.password, user.hashed_password):
+    # Authenticate
+    user = db.query(User).filter(User.email == email.lower()).first()
+    if not user or not verify_password(password, user.hashed_password):
         raise_http_error(
             status.HTTP_401_UNAUTHORIZED,
-            "Incorrect password",
-            "The password you entered is incorrect. Please try again.",
-            "password"
+            "Authentication Failed",
+            "Invalid email or password.",
         )
 
     token_data = {"user_id": user.id, "email": user.email, "role": user.role.value}
@@ -213,7 +256,7 @@ def login_email(data: UserLogin, db: Session = Depends(get_db)):
         "access_token": create_access_token(token_data),
         "refresh_token": create_refresh_token(token_data),
         "token_type": "bearer",
-        "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60
+        "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     }
 
 
