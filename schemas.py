@@ -104,13 +104,15 @@ class UserCreate(UserBase):
         return value
 
 class UserLogin(BaseModel):
-    """Schema for user login"""
+    """Schema for user login."""
+    # Accept multiple possible front-end keys via aliases for production compatibility
     email: str = Field(
         ..., 
         min_length=1, 
         max_length=255, 
         description="Your email address",
-        examples=["user@example.com", "john.doe@gmail.com"]
+        examples=["user@example.com", "john.doe@gmail.com"],
+        alias="emailOrUsername"
     )
     password: str = Field(
         ..., 
@@ -118,6 +120,9 @@ class UserLogin(BaseModel):
         description="Your password",
         examples=["mypassword123", "securepass456"]
     )
+
+    # Allow population by field name or alias (emailOrUsername)
+    model_config = ConfigDict(populate_by_name=True)
 
     @field_validator('email')
     @classmethod
